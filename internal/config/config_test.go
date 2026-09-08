@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"errors"
+	"log"
 	"log/slog"
 	"strings"
 	"testing"
@@ -131,17 +132,24 @@ func TestLoadInvalidRemapInterval(t *testing.T) {
 	}
 }
 
-// captureLogs redirects the default slog logger into a buffer for the duration
-// of the test, restoring the previous default on cleanup. parseRemapInterval
-// emits its warnings through the package default logger, so this lets a test
-// assert on those side-effects. The returned closure yields the buffer's
-// current contents.
+// captureLogs redirects the default slog logger into a buffer for the test and
+// returns a closure yielding its contents. parseRemapInterval warns through the
+// package default logger, so this lets a test assert on those side-effects.
+//
+// slog.SetDefault also points the log package at the installed handler and
+// zeroes its flags, and skips that redirect for slog's own default handler, so
+// restoring slog alone leaves log writing into a dead buffer. slog goes back
+// first: reinstalling a non-default prev re-runs the redirect.
 func captureLogs(t *testing.T) func() string {
 	t.Helper()
 	var buf bytes.Buffer
-	prev := slog.Default()
+	prev, prevWriter, prevFlags := slog.Default(), log.Writer(), log.Flags()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	t.Cleanup(func() {
+		slog.SetDefault(prev)
+		log.SetOutput(prevWriter)
+		log.SetFlags(prevFlags)
+	})
 	return buf.String
 }
 
