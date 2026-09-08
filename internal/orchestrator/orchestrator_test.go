@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -533,11 +534,29 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 	}
 }
 
-func TestApplyRemappings_DryRunPreviewLoggedAtInfo(t *testing.T) {
+// captureLogs installs a text handler at the default Info level over a buffer as the default logger for the
+// test and returns that buffer. Tests using it must NOT be parallel (the
+// default logger is process-global).
+//
+// slog.SetDefault also points the log package at the installed handler and
+// zeroes its flags, and skips that redirect for slog's own default handler, so
+// restoring slog alone leaves log writing into a dead buffer. slog goes back
+// first: reinstalling a non-default prev re-runs the redirect.
+func captureLogs(t *testing.T) *strings.Builder {
+	t.Helper()
 	var buf strings.Builder
-	orig := slog.Default()
+	prev, prevWriter, prevFlags := slog.Default(), log.Writer(), log.Flags()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(orig) })
+	t.Cleanup(func() {
+		slog.SetDefault(prev)
+		log.SetOutput(prevWriter)
+		log.SetFlags(prevFlags)
+	})
+	return &buf
+}
+
+func TestApplyRemappings_DryRunPreviewLoggedAtInfo(t *testing.T) {
+	buf := captureLogs(t)
 
 	o := New(&fakePlex{}, &fakeTautulli{}, &config.Config{DryRun: true})
 	matched := []remap.MatchResult{
@@ -1258,10 +1277,7 @@ func TestRun_BreakerTripAfterSuccessReturnsFalse(t *testing.T) {
 // scheduled run interrupted by shutdown is not logged as a failure, does not
 // count toward the failure threshold, and does not flip the health marker.
 func TestRunScheduler_ShutdownInterruptedRunNotCountedAsFailure(t *testing.T) {
-	var buf strings.Builder
-	orig := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(orig) })
+	buf := captureLogs(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // pre-cancelled on purpose; Background, not t.Context()
@@ -1366,10 +1382,7 @@ func (f *scriptedScheduler) GetHistory(_ context.Context, _ url.Values) (*tautul
 }
 
 func TestRunScheduler_FlipsUnhealthyAfterConsecutiveFailures(t *testing.T) {
-	var buf strings.Builder
-	orig := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(orig) })
+	buf := captureLogs(t)
 
 	// Background, not t.Context(): cancel is both the scheduler's stop signal
 	// and the Cleanup safety net, so its lifetime is tied to Cleanup.
@@ -1403,10 +1416,7 @@ func TestRunScheduler_FlipsUnhealthyAfterConsecutiveFailures(t *testing.T) {
 }
 
 func TestRunScheduler_ResetsFailureCountOnSuccess(t *testing.T) {
-	var buf strings.Builder
-	orig := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(orig) })
+	buf := captureLogs(t)
 
 	// Background, not t.Context(): cancel is both the scheduler's stop signal
 	// and the Cleanup safety net, so its lifetime is tied to Cleanup.
@@ -1501,10 +1511,7 @@ func TestApplyRemappings_ShutdownDuringUpdateIsNotAFailure(t *testing.T) {
 }
 
 func TestRun_DryRunWithMatch_PreviewsClear(t *testing.T) {
-	var buf strings.Builder
-	orig := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(orig) })
+	buf := captureLogs(t)
 
 	cfg := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		cmd := r.URL.Query().Get("cmd")
