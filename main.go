@@ -32,11 +32,10 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "health":
-			// Scheduled mode arms a freshness deadline (marker older than 3
-			// intervals means a wedged loop); resident-idle disables it
-			// (WithMaxAge(0) is a no-op) since idle is healthy there.
-			health.RunProbe(health.DefaultPath,
-				health.WithMaxAge(3*appconfig.RemapInterval()))
+			// Resident-idle yields Interval 0, which disables the lease: idle is
+			// healthy there, and a restart cannot fix a trigger that stopped firing.
+			lease := health.Lease{Interval: appconfig.RemapInterval(), Cycles: 3}
+			health.RunProbe(health.DefaultPath, health.WithMaxAge(lease.Duration()))
 		case "trigger":
 			runTrigger()
 		default:
