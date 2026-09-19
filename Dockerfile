@@ -14,10 +14,15 @@ COPY internal/ ./internal/
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /tautulli-remap .
+COPY LICENSE NOTICE ./
+COPY scripts/collect-licenses.sh scripts/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    sh scripts/collect-licenses.sh --name tautulli-remap .
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 
 COPY --chmod=755 --from=builder /tautulli-remap /tautulli-remap
+COPY --from=builder /out/usr/share/licenses /usr/share/licenses
 USER nonroot:nonroot
 # The "health" subcommand probes the /tmp/.healthy marker the main
 # process maintains. In scheduled mode it is created at startup, refreshed after
