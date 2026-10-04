@@ -91,7 +91,7 @@ tautulli-remap needs no volume and opens no port. [Configuration](docs/configura
 
 ## Security
 
-tautulli-remap opens no port, and connects out only to the Tautulli and Plex addresses you set. It never logs your API key or Plex token. It sends the token in a request header, and removes the key from every error it logs. Over a plain `http://` address, both cross your network unencrypted. Set `TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` to keep them out of `docker inspect`. The image runs as a non-root user on a distroless base, which has no shell. [Security](docs/security.md) has a hardened compose setup and lists what the image contains.
+tautulli-remap opens no port, and connects out only to the Tautulli and Plex addresses you set. It never logs your API key or Plex token. It sends the token in a request header, and removes the key from every error it logs. Over a plain `http://` address, both cross your network unencrypted. Set `TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` to keep them out of `docker inspect`. The image runs as a non-root user on a distroless base, which has no shell. [Security](docs/hardening.md) has a hardened compose setup and lists what the image contains.
 
 ## Troubleshooting
 
@@ -106,7 +106,7 @@ The healthcheck reads a file the app keeps in `/tmp`. With `REMAP_INTERVAL` set 
 
 - [How tautulli-remap works](docs/how-it-works.md) explains each pass and match method, for anyone asking why an item did or did not move.
 - [Configuration](docs/configuration.md) covers run modes, external schedulers and secret files.
-- [Security](docs/security.md) covers credential handling, a hardened compose setup and what the image contains.
+- [Security](docs/hardening.md) covers credential handling, a hardened compose setup and what the image contains.
 
 ## Credits
 
