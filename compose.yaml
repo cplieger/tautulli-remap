@@ -5,10 +5,11 @@ services:
     container_name: tautulli-remap
     restart: unless-stopped
 
+    # Put these four values in a .env file beside this file before the first start.
     environment:
-      TAUTULLI_URL: "http://tautulli:8181"
-      TAUTULLI_API_KEY: "your-tautulli-api-key"  # required
-      PLEX_URL: "http://plex:32400"
-      PLEX_TOKEN: "your-plex-token"  # required
-      REMAP_INTERVAL: "24h"  # Go duration; "off" = resident-idle
-      DRY_RUN: "true"  # set to false to apply changes
+      - TAUTULLI_URL  # from .env, the address you open Tautulli at, such as http://192.0.2.10:8181
+      - TAUTULLI_API_KEY  # from .env, the API key on Tautulli's Settings, Web Interface page
+      - PLEX_URL  # from .env, the address you open Plex at, such as http://192.0.2.10:32400
+      - PLEX_TOKEN  # from .env, find it with https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+      - "REMAP_INTERVAL=24h"  # a pass at start, then once a day. "off" runs a pass only when you trigger one
+      - "DRY_RUN=true"  # preview only. Set it to false to apply the changes
