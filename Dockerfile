@@ -28,8 +28,8 @@ USER nonroot:nonroot
 # process maintains. In scheduled mode it is created at startup, refreshed after
 # each run, and removed after 3 consecutive failures; in resident-idle mode it
 # reflects process liveness (created at startup, present while the process is
-# alive). Exits 0 if the marker is present, else 1. See the README
-# "Healthcheck" section.
+# alive). Exits 0 if the marker is present, else 1. See docs/how-it-works.md
+# "Health and exit codes".
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
     CMD ["/tautulli-remap", "health"]
 ENTRYPOINT ["/tautulli-remap"]

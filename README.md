@@ -3,31 +3,31 @@
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/tautulli-remap/badges/size.json)](https://github.com/cplieger/tautulli-remap/pkgs/container/tautulli-remap) [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://github.com/cplieger/tautulli-remap/pkgs/container/tautulli-remap) [![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)](https://github.com/cplieger/tautulli-remap/blob/main/Dockerfile) [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/tautulli-remap/badges/mutation.json)](https://github.com/cplieger/tautulli-remap/issues?q=label%3Agremlins-tracker) [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/tautulli-remap/releases)
 
 <!-- hub-overview BEGIN -->
-Fix broken Tautulli watch history after reorganizing your Plex libraries.
+tautulli-remap reconnects your Tautulli watch history and statistics to the right movies and shows after you move, re-add or reorganize your Plex libraries. It updates Tautulli only, and never changes your Plex library or your files.
 
 ## What it does
 
-When you reorganize your Plex libraries (move files, re-add content, change folder structure), Plex assigns new internal IDs to your media. This breaks Tautulli's watch history: it can no longer link history entries to the right items. This tool automatically finds the correct new IDs and updates Tautulli's database, preserving your watch history and statistics.
+tautulli-remap keeps your Tautulli history attached to your library, in four ways:
 
-For each stale entry, it finds the correct current rating key in Plex using a chain of strategies, most precise first:
+- Finds every history entry that points at a movie or show Plex no longer knows.
+- Matches each one to your library by its TMDB, TVDB, IMDb or Plex metadata ID, then by title and year.
+- Repairs every season and episode of a show once it finds the show.
+- Previews every change by default, and backs up Tautulli before it writes.
 
-1. **Episode-GUID resolution** (TV shows): resolves a show through one of its watched episodes' stable Plex GUIDs, which map directly to the show's current key. Exact and collision-free, and it restores the show's full watch history (all seasons and episodes).
-2. **GUID match**: Plex's globally unique identifier; covers movies and shows whose history still carries a show-level GUID, for example from the legacy `thetvdb` agent.
-3. **Title+year match** (fallback): matches by title and release year when no GUID resolves.
-4. **Title-only with media type guard** (optional): last resort matching by title alone, restricted to the same media type to reduce false positives.
+It can run once, once a day, or whenever your own scheduler asks.
 
-### Why this design
+## Who it is for
 
-- **Three run modes**: `REMAP_INTERVAL` set to a Go duration like `24h` for a built-in timer, `REMAP_INTERVAL=off` for resident-idle (stays healthy, awaits `docker exec ... tautulli-remap trigger`), or `tautulli-remap trigger` for a one-shot pass that reports its outcome via its exit code.
-- **Dry-run by default for safety**: no changes are applied until you explicitly set `DRY_RUN=false`, so you can always preview first.
-- **Matching strategies with increasing aggressiveness**: starts with the exact ones (episode-GUID resolution for shows, GUID match for movies), falls back to title+year, and optionally title-only, giving you control over the risk/coverage tradeoff.
-- **Stdlib-first, minimal dependencies**: pure Go on the standard library plus a first-party shared-lib set (`health`, `httpx`, `plexapi`, `scheduler`, `envx`, `slogx`, `runesafe`, `keyenc`) and `golang.org/x/sync`, minimizing supply-chain risk.
-- **Distroless and rootless**: runs as `nonroot` on `gcr.io/distroless/static-debian13` with no shell or package manager.
+tautulli-remap is built for people who run Tautulli beside a Plex Media Server and have moved files, re-added content or rebuilt a library. Plex then gives those items new internal IDs, called rating keys, while Tautulli keeps the old ones. It covers movie and TV libraries, not music or photos. Without it, you would open each broken item from Tautulli's history and click Fix Match on its page, one item at a time.
+
+You need a Tautulli instance and its API key, and a Plex Media Server and a Plex token for it.
+
+tautulli-remap is free software under the GPL-3.0-or-later license.
 <!-- hub-overview END -->
 
 ## Quick start
 
-Images are published to both `ghcr.io/cplieger/tautulli-remap` and `docker.io/cplieger/tautulli-remap`; use whichever you prefer.
+The image is on GitHub Container Registry and Docker Hub, for `amd64` and `arm64`. This is the [`compose.yaml`](compose.yaml) in this repository.
 
 ```yaml
 services:
@@ -36,126 +36,85 @@ services:
     container_name: tautulli-remap
     restart: unless-stopped
 
+    # Put these four values in a .env file beside this file before the first start.
     environment:
-      TAUTULLI_URL: "http://tautulli:8181"
-      TAUTULLI_API_KEY: "your-tautulli-api-key"  # required
-      PLEX_URL: "http://plex:32400"
-      PLEX_TOKEN: "your-plex-token"  # required
-      REMAP_INTERVAL: "24h"  # Go duration; "off" = resident-idle
-      DRY_RUN: "true"  # set to false to apply changes
+      - TAUTULLI_URL  # from .env, the address you open Tautulli at, such as http://192.0.2.10:8181
+      - TAUTULLI_API_KEY  # from .env, the API key on Tautulli's Settings, Web Interface page
+      - PLEX_URL  # from .env, the address you open Plex at, such as http://192.0.2.10:32400
+      - PLEX_TOKEN  # from .env, find it with https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+      - "REMAP_INTERVAL=24h"  # a pass at start, then once a day. "off" runs a pass only when you trigger one
+      - "DRY_RUN=true"  # preview only. Set it to false to apply the changes
 ```
+
+1. Create a folder named `tautulli-remap` and save the compose block above as `compose.yaml` in it.
+2. In Tautulli, open Settings, then Web Interface, and copy the API key.
+3. Find your Plex token with Plex's guide, [Finding an authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/).
+4. Create a file named `.env` beside `compose.yaml` with these four lines:
+
+   ```sh
+   TAUTULLI_URL=http://192.0.2.10:8181
+   TAUTULLI_API_KEY=your-tautulli-api-key
+   PLEX_URL=http://192.0.2.10:32400
+   PLEX_TOKEN=your-plex-token
+   ```
+
+   Use the addresses you open Tautulli and Plex at from another device on your network, with `http://` and the port, not `localhost`.
+5. Run `docker compose up -d`.
+
+The first pass starts right away and only previews. Run `docker logs tautulli-remap`. You should see one `remap` line for each item it would fix, with its title, old key, new key and match method. A `scan complete` line ends the pass. If you see `failed to get history`, check the Tautulli address and API key.
+
+## Apply the changes
+
+When the `remap` lines look right, set `DRY_RUN=false` in `compose.yaml` and run `docker compose up -d` again. Before its first change, each pass asks Tautulli to back up its database. If that backup fails, the pass stops without changing anything.
+
+When two Plex items share a title and year, it leaves that entry alone rather than guess. After it updates history, it clears Tautulli's recently added list, so that list shows no entries that point at old items. Tautulli fills it again from Plex. A later pass finds nothing left to fix and changes nothing. [How tautulli-remap works](docs/how-it-works.md) explains each match method.
 
 ## Configuration reference
 
-| Variable | Description | Default | Required |
-| --- | --- | --- | --- |
-| `TAUTULLI_URL` | Tautulli instance URL (Docker DNS name or LAN IP) | `http://tautulli:8181` | No |
-| `TAUTULLI_API_KEY` | Tautulli API key (Settings → Web Interface → API Key). Also readable from a file: see `TAUTULLI_API_KEY_FILE` below | - | Yes |
-| `PLEX_URL` | Plex Media Server URL (Docker DNS name or LAN IP) | `http://plex:32400` | No |
-| `PLEX_TOKEN` | Plex authentication token (see Plex support article). Also readable from a file: see `PLEX_TOKEN_FILE` below | - | Yes |
-| `TAUTULLI_API_KEY_FILE` | Path to a file holding the Tautulli API key (a Docker or Podman secret). When set it takes precedence over `TAUTULLI_API_KEY` and keeps the key out of the container environment, so it does not appear in `docker inspect`. One trailing line ending is stripped; a file holding only whitespace is rejected at startup | _(unset)_ | No |
-| `PLEX_TOKEN_FILE` | Path to a file holding the Plex token, on the same terms as `TAUTULLI_API_KEY_FILE` | _(unset)_ | No |
-| `REMAP_INTERVAL` | Go duration between remap runs (for example `24h`, `6h30m`). `off`/`disabled`/`0` = resident-idle (awaits external trigger via `tautulli-remap trigger`) | `off` | No |
-| `FALLBACK_TITLE_YEAR` | Try title+year matching when GUID match fails | `true` | No |
-| `FALLBACK_TITLE_ONLY` | Try title-only matching as last resort (risk of false matches) | `false` | No |
-| `DRY_RUN` | Log what would change without applying; set to `false` to apply | `true` | No |
-| `MAX_HISTORY_RECORDS` | Sanity cap on the Tautulli history size a run will process; runs abort above it. Raise it if your history is genuinely larger | `500000` | No |
+Settings are environment variables. The container reads them when it starts, so run `docker compose up -d` after a change.
 
-## Subcommands
+| Variable | Description | Default |
+| --- | --- | --- |
+| `TAUTULLI_URL` | Address of your Tautulli instance, with `http://` and the port | `http://tautulli:8181` |
+| `TAUTULLI_API_KEY` | Tautulli API key, from Settings, Web Interface. `TAUTULLI_API_KEY_FILE` reads it from a file instead | required |
+| `PLEX_URL` | Address of your Plex Media Server, with `http://` and the port | `http://plex:32400` |
+| `PLEX_TOKEN` | Plex token for that server. `PLEX_TOKEN_FILE` reads it from a file instead | required |
+| `REMAP_INTERVAL` | Time between passes, such as `24h` or `6h30m`. `off` runs a pass only when you run `tautulli-remap trigger` | `off` |
+| `DRY_RUN` | `true` only logs what would change. `false` applies it | `true` |
+| `FALLBACK_TITLE_YEAR` | Match by title and year when no metadata ID matches | `true` |
+| `FALLBACK_TITLE_ONLY` | Match by title alone as a last resort, which can pick the wrong item | `false` |
+| `MAX_HISTORY_RECORDS` | A pass stops without changes when Tautulli's history holds more entries than this | `500000` |
+| `TAUTULLI_API_KEY_FILE` | File holding the Tautulli API key, such as a Docker secret. It wins over `TAUTULLI_API_KEY` | _(unset)_ |
+| `PLEX_TOKEN_FILE` | File holding the Plex token, on the same terms as `TAUTULLI_API_KEY_FILE` | _(unset)_ |
 
-| Subcommand | Description |
-| --- | --- |
-| `tautulli-remap health` | Checks the `/tmp/.healthy` marker file. Used as the Docker `HEALTHCHECK`. Exits 0 (healthy) or 1 (unhealthy). |
-| `tautulli-remap trigger` | Executes a single remap pass immediately. Exits 0 on success, 1 on failure, 3 when interrupted by shutdown before completing (retryable). Designed for `docker exec` or Ofelia `job-exec`. |
-
-### One pass at a time
-
-Remap passes are serialized by a cross-process lock (`/tmp/.remap.lock`): the
-built-in timer, an external `trigger`, and a manual `docker exec` can never run
-concurrent passes. A pass that finds another one already running refuses
-immediately, before contacting Tautulli or Plex, and reports failure (a
-trigger exits 1; a scheduled pass counts it toward the unhealthy threshold),
-so a wedged pass surfaces through your scheduler's alerting instead of being
-silently skipped. Since passes are idempotent, re-run once the active pass
-finishes.
-
-### Recommended deployment with external scheduling
-
-Use `REMAP_INTERVAL=off` (resident-idle, one of the three [run modes](#why-this-design)) with an external scheduler like Ofelia:
-
-```yaml
-services:
-  tautulli-remap:
-    image: ghcr.io/cplieger/tautulli-remap:latest
-    environment:
-      REMAP_INTERVAL: "off"  # resident-idle, awaits trigger
-      DRY_RUN: "false"
-      # ... other env vars
-    labels:
-      ofelia.enabled: "true"
-      ofelia.job-exec.tautulli-remap.schedule: "0 0 3 * * *"
-      ofelia.job-exec.tautulli-remap.command: "/tautulli-remap trigger"
-```
-
-This keeps the container healthy (passing healthchecks) while delegating scheduling to Ofelia.
-
-## Healthcheck
-
-The container includes a built-in Docker healthcheck via the `/tautulli-remap health` subcommand, which checks for a marker file at `/tmp/.healthy`. What that marker reflects depends on the run mode:
-
-- **Scheduled mode** (`REMAP_INTERVAL` set to a duration): the main process refreshes `/tmp/.healthy` after each run and marks the container unhealthy after 3 consecutive failed runs (Tautulli or Plex APIs unreachable, returning errors, or the remap logic failing), recovering automatically on the next successful run (including runs where nothing needs remapping).
-- **Resident-idle mode** (`REMAP_INTERVAL=off`): the marker reflects the resident process's liveness. Each `tautulli-remap trigger` run reports its own outcome via its exit code (0 success / 1 failure / 3 interrupted by shutdown before completing) for the external scheduler to act on; a failed trigger deliberately does **not** mark the long-lived container unhealthy.
+tautulli-remap needs no volume and opens no port. [Configuration](docs/configuration.md) covers the run modes, starting passes from your own scheduler, and reading the key and token from files.
 
 ## Security
 
-No network listener; the container connects outbound to Tautulli and Plex
-only. Set `DRY_RUN=true` on first run to preview changes safely.
+tautulli-remap opens no port, and connects out only to the Tautulli and Plex addresses you set. It never logs your API key or Plex token. It sends the token in a request header, and removes the key from every error it logs. Over a plain `http://` address, both cross your network unencrypted. Set `TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` to keep them out of `docker inspect`. The image runs as a non-root user on a distroless base, which has no shell. [Security](docs/security.md) has a hardened compose setup and lists what the image contains.
 
-API tokens never reach the logs: the Plex token travels in the
-`X-Plex-Token` header rather than the query string, and HTTP error messages
-strip query parameters so the Tautulli API key cannot leak. Rating keys are
-validated as numeric before URL interpolation, which blocks path traversal.
-All HTTP calls use explicit timeouts and capped response bodies; transient
-failures on reads are retried with bounded backoff, and mutating Tautulli
-calls are never retried. The code uses no `unsafe`, `reflect`, or `os/exec`,
-and its only file I/O is the health marker and run lock on `/tmp`.
+## Troubleshooting
 
-The image runs as `nonroot` on a distroless base with no shell or package
-manager. For a hardened deployment, add `read_only: true`, `cap_drop: [ALL]`,
-`no-new-privileges:true`, and a small tmpfs for `/tmp` (16 MB covers the
-health marker and run lock).
+The healthcheck reads a file the app keeps in `/tmp`. With `REMAP_INTERVAL` set to a duration, the container turns unhealthy after 3 failed passes in a row. It also turns unhealthy when no pass has succeeded for 3 intervals. The next good pass makes it healthy again. With `REMAP_INTERVAL=off`, the container stays healthy while it runs, and `tautulli-remap trigger` reports each pass through its exit code.
 
-Live scan results are on the repository's Security tab. One accepted
-finding: semgrep reports a single informational hit, a false positive.
+- The container restarts in a loop with `failed to load configuration`. `TAUTULLI_API_KEY` or `PLEX_TOKEN` did not reach it. Check `.env`, then run `docker compose up -d`.
+- The log says `failed to get history`. The Tautulli address or API key is wrong, or Tautulli is down.
+- The log says `aborting run: Plex returned errors`. The Plex address or token is wrong, or Plex is down. The pass stops before it changes anything.
+- The log says `another remap pass is already running`. A pass started while another one ran, and was refused. Start it again once the first one ends.
 
-## Dependencies
+## Documentation
 
-All dependencies are updated automatically via [Renovate](https://github.com/renovatebot/renovate) and pinned by digest or version for reproducibility.
-
-| Dependency | Source | Role |
-| --- | --- | --- |
-| golang | [Go](https://hub.docker.com/_/golang) | Build image |
-| gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) | Runtime base image |
-| health | [cplieger/health](https://github.com/cplieger/health) | File-marker healthcheck |
-| httpx | [cplieger/httpx](https://github.com/cplieger/httpx) | Retrying HTTP + secret redaction (Tautulli) |
-| plexapi | [cplieger/plexapi](https://github.com/cplieger/plexapi) | Plex API client |
-| scheduler | [cplieger/scheduler](https://github.com/cplieger/scheduler) | Cross-process run lock |
-| envx | [cplieger/envx](https://github.com/cplieger/envx) | Env var parsing |
-| slogx | [cplieger/slogx](https://github.com/cplieger/slogx) | Logging setup |
-| runesafe | [cplieger/runesafe](https://github.com/cplieger/runesafe) | Untrusted-string tagging (Plex titles) |
-| keyenc | [cplieger/keyenc](https://github.com/cplieger/keyenc) | Escaped composite keys for the title indexes |
-| golang.org/x/sync | [x/sync](https://pkg.go.dev/golang.org/x/sync) | Bounded concurrency (errgroup) |
-| rapid | [pgregory.net/rapid](https://github.com/flyingmutant/rapid) | Property-based tests (test-only) |
+- [How tautulli-remap works](docs/how-it-works.md) explains each pass and match method, for anyone asking why an item did or did not move.
+- [Configuration](docs/configuration.md) covers run modes, external schedulers and secret files.
+- [Security](docs/security.md) covers credential handling, a hardened compose setup and what the image contains.
 
 ## Credits
 
-This is an original tool that builds upon [Tautulli](https://github.com/Tautulli/Tautulli).
-Inspired by [SwiftPanda16's Tautulli rating key update script](https://gist.github.com/JonnyWong16/f554f407832076919dc6864a78432db2).
+tautulli-remap repairs history through the API of [Tautulli](https://github.com/Tautulli/Tautulli), and all credit for Tautulli goes to its maintainers. Its matching order, with title-and-year and title-only fallbacks, a dry run switch and a backup before writing, follows [SwiftPanda16's Tautulli rating key update script](https://gist.github.com/JonnyWong16/f554f407832076919dc6864a78432db2).
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for
-larger changes so the approach can be discussed before implementation.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and open an issue first for larger changes.
 
 ## Disclaimer
 
