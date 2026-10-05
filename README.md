@@ -114,7 +114,7 @@ tautulli-remap repairs history through the API of [Tautulli](https://github.com/
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and open an issue first for larger changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
