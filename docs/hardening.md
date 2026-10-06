@@ -16,7 +16,7 @@ This page covers how tautulli-remap handles your Tautulli API key and Plex token
 
 ## Hardened compose setup
 
-These settings make the container's file system read-only, drop every Linux capability and block privilege gains. The 16 MB `/tmp` holds the health file and the run lock.
+Add these lines to the service in `compose.yaml`. [Hardening a compose file](https://github.com/cplieger/docs/blob/main/docs/hardening.md) explains each setting. The 16 MB `/tmp` holds the health file and the run lock.
 
 ```yaml
 services:
