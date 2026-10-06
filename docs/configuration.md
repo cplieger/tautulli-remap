@@ -40,27 +40,14 @@ The container stays healthy between runs, and your scheduler reads each pass's e
 
 ## Read the key and token from files
 
-`TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` name a file that holds the value, such as a Docker or Podman secret. The value then stays out of the container's environment, so it does not appear in `docker inspect`.
+`TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` name a file that holds the value, such as a Docker or Podman secret.
 
 - A file setting wins over the plain variable when both are set.
 - One trailing line ending is removed from the file's content, and every other byte is kept.
 - A file that is empty or holds only spaces and line breaks stops the container at start.
 - The path must be written plainly, with no `..` and no doubled or trailing `/`.
 
-With a compose secret, the service part looks like this:
-
-```yaml
-services:
-  tautulli-remap:
-    environment:
-      - "TAUTULLI_API_KEY_FILE=/run/secrets/tautulli_api_key"
-    secrets:
-      - tautulli_api_key
-
-secrets:
-  tautulli_api_key:
-    file: ./tautulli_api_key.txt
-```
+With a compose secret named `tautulli_api_key`, set `TAUTULLI_API_KEY_FILE=/run/secrets/tautulli_api_key`, as [Secrets in files](https://github.com/cplieger/docs/blob/main/docs/hardening.md#secrets-in-files) shows.
 
 A plain `TAUTULLI_API_KEY` or `PLEX_TOKEN` that holds only spaces is accepted. The app logs a warning at start, because Tautulli or Plex will reject it.
 
