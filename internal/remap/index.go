@@ -20,11 +20,11 @@ type PlexLibraryFetcher interface {
 	LibraryAll(ctx context.Context, sectionKey string) ([]LibItem, error)
 }
 
-// NormalizeTitle applies the canonical title normalization used for index
+// normalizeTitle applies the canonical title normalization used for index
 // keys and lookups. Both BuildPlexIndex and matchOne use this function,
 // ensuring the invariant that index key == lookup key is enforced by
 // construction.
-func NormalizeTitle(title string) string {
+func normalizeTitle(title string) string {
 	return strings.ToLower(strings.TrimSpace(title))
 }
 
@@ -113,10 +113,8 @@ func newPlexIndex() *plexIndex {
 func (idx *plexIndex) add(li LibItem, mediaType MediaType) {
 	entry := PlexEntry{
 		RatingKey: strconv.Itoa(li.RatingKey),
-		Title:     li.Title,
 		Year:      strconv.Itoa(li.Year),
 		Type:      mediaType,
-		GUIDs:     li.GUIDs,
 	}
 
 	idx.mu.Lock()
@@ -132,7 +130,7 @@ func (idx *plexIndex) add(li LibItem, mediaType MediaType) {
 		idx.byGUID[g] = entry
 	}
 
-	normalizedTitle := NormalizeTitle(li.Title.Raw())
+	normalizedTitle := normalizeTitle(li.Title.Raw())
 	tyKey := titleYearKey(normalizedTitle, entry.Year, mediaType)
 	if prev, ok := idx.byTitleYear[tyKey]; ok && prev.RatingKey != entry.RatingKey {
 		slog.Warn("title+year index shadow; refusing to match this ambiguous slot",
@@ -160,7 +158,7 @@ func (idx *plexIndex) scanSection(ctx context.Context, plex PlexLibraryFetcher, 
 		return nil
 	}
 	slog.Info("scanning library", "title", sec.Title)
-	mediaType := ParseMediaType(sec.Type)
+	mediaType := parseMediaType(sec.Type)
 	items, err := plex.LibraryAll(ctx, sec.Key)
 	if err != nil {
 		if ctx.Err() != nil {

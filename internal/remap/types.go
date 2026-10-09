@@ -10,44 +10,41 @@ import (
 // MediaType represents the type of media item.
 type MediaType string
 
-// Movie, Show, and Episode are the supported Plex media type values.
+// Movie, Show, and episode are the supported Plex media type values.
 const (
 	Movie   MediaType = "movie"
 	Show    MediaType = "show"
-	Episode MediaType = "episode"
+	episode MediaType = "episode"
 )
 
 // String returns the string representation of a MediaType.
 func (m MediaType) String() string { return string(m) }
 
-// ParseMediaType converts a string to MediaType, returning empty string for unknown values.
-func ParseMediaType(s string) MediaType {
+// parseMediaType converts a string to MediaType, returning empty string for unknown values.
+func parseMediaType(s string) MediaType {
 	switch MediaType(s) {
-	case Movie, Show, Episode:
+	case Movie, Show, episode:
 		return MediaType(s)
 	default:
 		return ""
 	}
 }
 
-// MatchMethod identifies the strategy used to match a stale item.
-type MatchMethod string
+// matchMethod identifies the strategy used to match a stale item.
+type matchMethod string
 
-// MethodEpisodeGUID, MethodGUID, MethodTitleYear, and MethodTitleOnly enumerate
+// methodEpisodeGUID, MethodGUID, methodTitleYear, and methodTitleOnly enumerate
 // the available matching strategies in increasing order of aggressiveness.
-// MethodEpisodeGUID is show-only: a stale show is resolved through one of its
+// methodEpisodeGUID is show-only: a stale show is resolved through one of its
 // watched episodes' GUIDs (which Tautulli history retains even when the show's
 // own GUID is not stored), giving an exact current show key with no title or
 // year guesswork.
 const (
-	MethodEpisodeGUID MatchMethod = "episode-guid"
-	MethodGUID        MatchMethod = "guid"
-	MethodTitleYear   MatchMethod = "title+year"
-	MethodTitleOnly   MatchMethod = "title only"
+	methodEpisodeGUID matchMethod = "episode-guid"
+	MethodGUID        matchMethod = "guid"
+	methodTitleYear   matchMethod = "title+year"
+	methodTitleOnly   matchMethod = "title only"
 )
-
-// String returns the string representation of a MatchMethod.
-func (m MatchMethod) String() string { return string(m) }
 
 // RatingKey is a Plex rating key (always a positive integer as string).
 type RatingKey string
@@ -65,19 +62,19 @@ func (r RatingKey) IsValid() bool {
 	return true
 }
 
-// FlexInt unmarshals a JSON number or a quoted numeric string into an int,
+// flexInt unmarshals a JSON number or a quoted numeric string into an int,
 // coercing empty, null, or otherwise non-numeric JSON values to zero.
-type FlexInt int
+type flexInt int
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (f *FlexInt) UnmarshalJSON(data []byte) error {
+func (f *flexInt) UnmarshalJSON(data []byte) error {
 	var raw any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	switch val := raw.(type) {
 	case float64:
-		*f = FlexInt(int(val))
+		*f = flexInt(int(val))
 	case string:
 		if val == "" {
 			*f = 0
@@ -88,7 +85,7 @@ func (f *FlexInt) UnmarshalJSON(data []byte) error {
 			*f = 0
 			return nil
 		}
-		*f = FlexInt(n)
+		*f = flexInt(n)
 	case nil:
 		*f = 0
 	default:
@@ -97,14 +94,14 @@ func (f *FlexInt) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// TautulliEntry represents a unique item from Tautulli history.
+// TautulliEntry represents a unique item from Tautulli history, keyed by its
+// rating key in the map that holds it.
 //
-// Title (here and on PlexEntry / MatchResult / UnmatchResult / HistoryItem /
-// Section / LibItem) carries the runesafe.Untrusted tag since it is
-// media-server text sourced from the wild — sanitized automatically at every
-// slog emit; NormalizeTitle reads Raw() for matching.
+// Title (here and on MatchResult / UnmatchResult / HistoryItem / Section /
+// LibItem) carries the runesafe.Untrusted tag since it is media-server text
+// sourced from the wild — sanitized automatically at every slog emit;
+// normalizeTitle reads Raw() for matching.
 type TautulliEntry struct {
-	RatingKey string
 	Title     runesafe.Untrusted
 	Year      string
 	MediaType MediaType
@@ -121,10 +118,8 @@ type TautulliEntry struct {
 // PlexEntry represents a Plex library item used for matching.
 type PlexEntry struct {
 	RatingKey string
-	Title     runesafe.Untrusted
 	Year      string
 	Type      MediaType
-	GUIDs     []string
 }
 
 // MatchResult holds the outcome of a successful match.
@@ -134,7 +129,7 @@ type MatchResult struct {
 	OldKey    string
 	NewKey    string
 	MediaType MediaType
-	Method    MatchMethod
+	Method    matchMethod
 	// MatchedYear is the matched Plex entry's release year, set only for
 	// title-only matches — the one strategy where it can differ from Year
 	// (the history item's year). Consumers surface the transition instead of
@@ -159,34 +154,21 @@ type HistoryItem struct {
 	GUID             string             `json:"guid"`
 	// MediaType is decoded as a plain string rather than MediaType so a row
 	// with an unexpected value (music, clip, live TV) does not fail the whole
-	// page decode; ProcessHistoryRow validates it via ParseMediaType.
+	// page decode; ProcessHistoryRow validates it via parseMediaType.
 	MediaType            string  `json:"media_type"`
-	RatingKey            FlexInt `json:"rating_key"`
-	Year                 FlexInt `json:"year"`
-	GrandparentRatingKey FlexInt `json:"grandparent_rating_key"`
+	RatingKey            flexInt `json:"rating_key"`
+	Year                 flexInt `json:"year"`
+	GrandparentRatingKey flexInt `json:"grandparent_rating_key"`
 }
 
-// GUIDMapping maps a source prefix to its canonical scheme.
-type GUIDMapping struct {
+// guidMapping maps a source prefix to its canonical scheme.
+type guidMapping struct {
 	Source    string
 	Canonical string
 	StripPath bool
 }
 
-// GUID prefix literals (see GUIDMappings for semantics). themoviedb:// and
-// thetvdb:// are Source-only, canonicalizing to tmdb:// and tvdb://. Hoisted
-// into constants so tests referencing canonical prefixes cannot drift.
-const (
-	GUIDPrefixTheMovieDB = "themoviedb://"
-	GUIDPrefixTheTVDB    = "thetvdb://"
-	GUIDPrefixIMDB       = "imdb://"
-	GUIDPrefixTMDB       = "tmdb://"
-	GUIDPrefixTVDB       = "tvdb://"
-	GUIDPrefixMBID       = "mbid://"
-	GUIDPrefixPlex       = "plex://"
-)
-
-// GUIDMappings defines the known GUID prefix transformations.
+// guidMappings defines the known GUID prefix transformations.
 //
 // ORDER IS SIGNIFICANT. NormalizeGUID matches each Source with
 // strings.Contains and returns on the first hit, so a Source that embeds a
@@ -194,15 +176,25 @@ const (
 // "tvdb://", so the StripPath=true thetvdb entry must precede the bare tvdb
 // entry, or legacy "thetvdb://<id>/<season>/<ep>" GUIDs would resolve via tvdb
 // and never strip to the series id. Do not reorder (e.g. alphabetize).
-var GUIDMappings = [...]GUIDMapping{
-	{GUIDPrefixTheMovieDB, GUIDPrefixTMDB, false},
-	{GUIDPrefixTheTVDB, GUIDPrefixTVDB, true},
-	{GUIDPrefixIMDB, GUIDPrefixIMDB, false},
-	{GUIDPrefixTMDB, GUIDPrefixTMDB, false},
-	{GUIDPrefixTVDB, GUIDPrefixTVDB, false},
-	{GUIDPrefixMBID, GUIDPrefixMBID, false},
-	{GUIDPrefixPlex, GUIDPrefixPlex, false},
+var guidMappings = [...]guidMapping{
+	{"themoviedb://", guidPrefixTMDB, false},
+	{"thetvdb://", guidPrefixTVDB, true},
+	{guidPrefixIMDB, guidPrefixIMDB, false},
+	{guidPrefixTMDB, guidPrefixTMDB, false},
+	{guidPrefixTVDB, guidPrefixTVDB, false},
+	{guidPrefixMBID, guidPrefixMBID, false},
+	{guidPrefixPlex, guidPrefixPlex, false},
 }
+
+// Canonical GUID prefixes; themoviedb:// and thetvdb:// are Source-only
+// legacy spellings that canonicalize to tmdb:// and tvdb://.
+const (
+	guidPrefixIMDB = "imdb://"
+	guidPrefixTMDB = "tmdb://"
+	guidPrefixTVDB = "tvdb://"
+	guidPrefixMBID = "mbid://"
+	guidPrefixPlex = "plex://"
+)
 
 // Section represents a Plex library section.
 type Section struct {

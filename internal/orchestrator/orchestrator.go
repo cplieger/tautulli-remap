@@ -137,7 +137,7 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 
 	// Step 1: Collect items from Tautulli history
 	slog.Info("step 1: collecting items from Tautulli history")
-	tautulliItems, episodeGUIDsCaptured := o.CollectTautulliItems(ctx)
+	tautulliItems, episodeGUIDsCaptured := o.collectTautulliItems(ctx)
 	if tautulliItems == nil {
 		return false
 	}
@@ -151,7 +151,7 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 
 	// Step 2: Find stale keys
 	slog.Info("step 2: checking keys against Plex")
-	stale, err := o.FindStaleKeys(ctx, tautulliItems)
+	stale, err := o.findStaleKeys(ctx, tautulliItems)
 	if err != nil {
 		if ctx.Err() != nil {
 			slog.Info("run cancelled during stale check", "cause", context.Cause(ctx))
@@ -191,13 +191,13 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 
 	// Step 4.5: backup, deferred until at least one mapping is ready so a
 	// pass with nothing to mutate never spends one. It still precedes the
-	// first write (ApplyRemappings and the recently-added clear).
+	// first write (applyRemappings and the recently-added clear).
 	if len(matched) > 0 && !o.createBackup(ctx) {
 		return false
 	}
 
 	// Step 5: Apply remappings
-	updated, failed, aborted := o.ApplyRemappings(ctx, matched, unmatched)
+	updated, failed, aborted := o.applyRemappings(ctx, matched, unmatched)
 
 	// A shutdown during apply must not report success: applyMatched returns
 	// aborted=false on cancellation, so without this guard failed==0 would
@@ -247,9 +247,9 @@ func (o *Orchestrator) acquireRunLock() (*scheduler.Lock, bool) {
 func (o *Orchestrator) clearIfNeeded(ctx context.Context, updated, matched int) bool {
 	switch {
 	case updated > 0:
-		return o.ClearRecentlyAdded(ctx)
+		return o.clearRecentlyAdded(ctx)
 	case o.cfg.DryRun && matched > 0:
-		return o.ClearRecentlyAdded(ctx)
+		return o.clearRecentlyAdded(ctx)
 	default:
 		slog.Info("skipping clear recently added", "reason", "no_updates")
 		return true
@@ -351,11 +351,11 @@ func (o *Orchestrator) RunScheduler(ctx context.Context, setHealthy func(bool)) 
 	}
 }
 
-// CollectTautulliItems retrieves all unique items from Tautulli watch history,
+// collectTautulliItems retrieves all unique items from Tautulli watch history,
 // returning a map of rating key to entry. Episodes are stored under their
 // grandparent (show) key; their episode-scoped plex:// GUIDs are retained on
 // the show entry (for later resolution) and counted in episodeGUIDsCaptured.
-func (o *Orchestrator) CollectTautulliItems(ctx context.Context) (items map[string]remap.TautulliEntry, episodeGUIDsCaptured int) {
+func (o *Orchestrator) collectTautulliItems(ctx context.Context) (items map[string]remap.TautulliEntry, episodeGUIDsCaptured int) {
 	items = map[string]remap.TautulliEntry{}
 	start := 0
 	total := -1
@@ -434,13 +434,13 @@ func addHistoryPage(page *tautulli.HistoryPage, items map[string]remap.TautulliE
 	return captured
 }
 
-// FindStaleKeys checks each item in the Tautulli history map against the Plex
+// findStaleKeys checks each item in the Tautulli history map against the Plex
 // API and returns only the entries whose rating keys no longer exist in Plex.
 // A non-nil error means at least one Plex check failed in a way that could
 // not be resolved (a real outage, not a 404); the first such error cancels
 // the remaining checks. The (possibly partial) stale map is returned
 // alongside the error for diagnostics but must not be trusted.
-func (o *Orchestrator) FindStaleKeys(ctx context.Context, items map[string]remap.TautulliEntry) (map[string]remap.TautulliEntry, error) {
+func (o *Orchestrator) findStaleKeys(ctx context.Context, items map[string]remap.TautulliEntry) (map[string]remap.TautulliEntry, error) {
 	var mu sync.Mutex
 	stale := map[string]remap.TautulliEntry{}
 
@@ -532,12 +532,12 @@ func (o *Orchestrator) resolveOneShow(ctx context.Context, episodeGUIDs []string
 	return ""
 }
 
-// ApplyRemappings updates Tautulli metadata for each matched item and logs
+// applyRemappings updates Tautulli metadata for each matched item and logs
 // all unmatched items. Returns the count of successfully updated records, the
 // count of failures, and whether the run was aborted by the consecutive-
 // failure circuit breaker. In dry-run mode it logs what would change without
 // writing to Tautulli.
-func (o *Orchestrator) ApplyRemappings(
+func (o *Orchestrator) applyRemappings(
 	ctx context.Context,
 	matched []remap.MatchResult,
 	unmatched []remap.UnmatchResult,
@@ -586,7 +586,7 @@ func logScanComplete(total, stale, matched, unmatched, updated, failed int, dryR
 
 // logRemap emits the per-item remap line. A title-only match may land on an
 // entry with a different year; the transition rides a dedicated matched_year
-// field appended only when it is informative (MatchMethod stays a closed enum).
+// field appended only when it is informative (Method stays a closed enum).
 func (o *Orchestrator) logRemap(m *remap.MatchResult) {
 	attrs := []any{
 		"title", m.Title, "year", m.Year, "type", m.MediaType,
@@ -637,11 +637,11 @@ func (o *Orchestrator) applyMatched(ctx context.Context, matched []remap.MatchRe
 	return updated, failed, false
 }
 
-// ClearRecentlyAdded removes all entries from Tautulli's recently-added table
+// clearRecentlyAdded removes all entries from Tautulli's recently-added table
 // to prevent stale entries from appearing in the UI after a remap. No-op in
 // dry-run mode. Returns false when the live clear failed, so the run result
 // reflects the incomplete cleanup rather than silently reporting success.
-func (o *Orchestrator) ClearRecentlyAdded(ctx context.Context) bool {
+func (o *Orchestrator) clearRecentlyAdded(ctx context.Context) bool {
 	if o.cfg.DryRun {
 		slog.Info("(dry run) would clear recently added items")
 		return true

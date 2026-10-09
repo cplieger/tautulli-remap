@@ -9,7 +9,7 @@ func TestFlexIntUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name string
 		json string
-		want FlexInt
+		want flexInt
 	}{
 		{"float", "42.0", 42},
 		{"string", `"123"`, 123},
@@ -19,7 +19,7 @@ func TestFlexIntUnmarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var f FlexInt
+			var f flexInt
 			if err := json.Unmarshal([]byte(tt.json), &f); err != nil {
 				t.Fatalf("unmarshal error: %v", err)
 			}
@@ -46,7 +46,7 @@ func TestParseMediaType(t *testing.T) {
 	}{
 		{"movie", Movie},
 		{"show", Show},
-		{"episode", Episode},
+		{"episode", episode},
 		{"artist", ""},
 		{"track", ""},
 		{"", ""},
@@ -54,16 +54,10 @@ func TestParseMediaType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			if got := ParseMediaType(tt.in); got != tt.want {
-				t.Errorf("ParseMediaType(%q) = %q, want %q", tt.in, got, tt.want)
+			if got := parseMediaType(tt.in); got != tt.want {
+				t.Errorf("parseMediaType(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestMatchMethod(t *testing.T) {
-	if MethodGUID.String() != "guid" {
-		t.Errorf("MethodGUID.String() = %q", MethodGUID.String())
 	}
 }
 
@@ -97,7 +91,7 @@ func TestFlexIntUnmarshalJSON_nonNumericTypesCoerceToZero(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := FlexInt(99)
+			f := flexInt(99)
 			if err := f.UnmarshalJSON([]byte(tt.json)); err != nil {
 				t.Fatalf("UnmarshalJSON(%s) unexpected error: %v", tt.json, err)
 			}
@@ -109,7 +103,7 @@ func TestFlexIntUnmarshalJSON_nonNumericTypesCoerceToZero(t *testing.T) {
 }
 
 func TestFlexIntUnmarshalJSON_malformedReturnsError(t *testing.T) {
-	var f FlexInt
+	var f flexInt
 	if err := f.UnmarshalJSON([]byte("{")); err == nil {
 		t.Error("UnmarshalJSON of malformed JSON should return an error")
 	}
