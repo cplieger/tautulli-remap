@@ -331,7 +331,7 @@ func TestBuildPlexIndex_SkipsNonMovieShowSections(t *testing.T) {
 		t.Error("non-movie/show (artist) section must be skipped, but its GUID was indexed")
 	}
 	// If the skip guard regressed, the artist item would be indexed with an
-	// empty media type (ParseMediaType("artist") == ""), i.e. under the (some album, "") and
+	// empty media type (parseMediaType("artist") == ""), i.e. under the (some album, "") and
 	// (some album, 2001, "") slots. Assert those exact slots stay absent.
 	if _, ok := idx.ByTitle[titleKey("some album", MediaType(""))]; ok {
 		t.Error("non-movie/show (artist) section must be skipped, but its title was indexed")
@@ -411,7 +411,7 @@ func TestMatch_CrossTypeSameTitleYear_RecoversMovieMatch(t *testing.T) {
 	// Stale Movie whose GUID no longer resolves (absent from idx.ByGUID) falls back
 	// to title+year and must land on the Movie, not the Show.
 	stale := map[string]TautulliEntry{
-		"99": {RatingKey: "99", Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
+		"99": {Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
 	}
 	matched, unmatched := MatchStaleItems(stale, nil, idx, Fallbacks{TitleYear: true, TitleOnly: false})
 	if len(matched) != 1 || len(unmatched) != 0 {
@@ -420,8 +420,8 @@ func TestMatch_CrossTypeSameTitleYear_RecoversMovieMatch(t *testing.T) {
 	if matched[0].NewKey != "10" {
 		t.Errorf("NewKey = %q, want 10 (the Movie, never the Show key 20)", matched[0].NewKey)
 	}
-	if matched[0].Method != MethodTitleYear {
-		t.Errorf("Method = %q, want %q", matched[0].Method, MethodTitleYear)
+	if matched[0].Method != methodTitleYear {
+		t.Errorf("Method = %q, want %q", matched[0].Method, methodTitleYear)
 	}
 }
 
@@ -449,7 +449,7 @@ func TestMatch_SameTypeTitleYearTwin_StillRefusesToMatch(t *testing.T) {
 	}
 
 	stale := map[string]TautulliEntry{
-		"99": {RatingKey: "99", Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
+		"99": {Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
 	}
 	matched, unmatched := MatchStaleItems(stale, nil, idx, Fallbacks{TitleYear: true, TitleOnly: false})
 	if len(matched) != 0 || len(unmatched) != 1 {
@@ -569,7 +569,7 @@ func TestIndexKeysOrdinaryInputIsPlainSeparatorJoin(t *testing.T) {
 	}{
 		{name: "movie", title: "the matrix", year: "1999", mediaType: Movie},
 		{name: "show", title: "heat", year: "1995", mediaType: Show},
-		{name: "episode", title: "pilot", year: "2008", mediaType: Episode},
+		{name: "episode", title: "pilot", year: "2008", mediaType: episode},
 		{name: "unknown media type", title: "some album", year: "2001", mediaType: MediaType("")},
 		{name: "empty title", title: "", year: "2020", mediaType: Movie},
 		{name: "title with spaces and punctuation", title: "dune, part two", year: "2024", mediaType: Movie},
@@ -651,7 +651,7 @@ func TestIndexKeysColonBearingTitleIsEscapedAndFaithful(t *testing.T) {
 //
 // Reachability, stated honestly: the forging cases below need TWO components to
 // carry the separator, and today only the title can — year is strconv.Itoa of an
-// int and mediaType is one of ParseMediaType's values. So these tuples are not
+// int and mediaType is one of parseMediaType's values. So these tuples are not
 // producible by the current pipeline, and the test guards the encoder against
 // exactly the change titleYearKey's doc comment warns about (a free-form
 // component appended, or year widened to a range), where the failure would be a
@@ -758,7 +758,7 @@ func TestIndexKeysBuilderAndLookupAgree(t *testing.T) {
 	}
 
 	// Rebuild the lookup key exactly as matchOne does, from the same raw title.
-	normalized := NormalizeTitle("Dune | Extended Edition")
+	normalized := normalizeTitle("Dune | Extended Edition")
 	if got, ok := idx.ByTitleYear[titleYearKey(normalized, "2021", Movie)]; !ok || got.RatingKey != "42" {
 		t.Errorf("idx.ByTitleYear lookup for a separator-bearing title = (%+v, %v), want rating key 42 present", got, ok)
 	}

@@ -94,7 +94,7 @@ func TestMatchOne(t *testing.T) {
 		// byGUID is keyed by the bare GUID, not by type, so a stale Movie's
 		// tmdb:// ID must not match a Show indexed under the same GUID.
 		item := &TautulliEntry{GUID: "tmdb://12345", Title: "Quiz Show", Year: "1994", MediaType: Movie}
-		byGUID := map[string]PlexEntry{"tmdb://12345": {RatingKey: "200", Title: "Quiz Show", Year: "1994", Type: Show}}
+		byGUID := map[string]PlexEntry{"tmdb://12345": {RatingKey: "200", Year: "1994", Type: Show}}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{ByGUID: byGUID}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "" || method != "" || matchedYear != "" {
 			t.Errorf("got (%q, %q, %q), want empty (GUID strategy must reject a cross-type match)", key, method, matchedYear)
@@ -105,7 +105,7 @@ func TestMatchOne(t *testing.T) {
 		item := &TautulliEntry{Title: "Movie", Year: "2020", MediaType: Movie}
 		byTY := map[string]PlexEntry{titleYearKey("movie", "2020", Movie): {RatingKey: "200", Type: Movie}}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitleYear: byTY}, Fallbacks{TitleYear: true, TitleOnly: true})
-		if key != "200" || method != MethodTitleYear {
+		if key != "200" || method != methodTitleYear {
 			t.Errorf("got (%q, %q), want (200, title+year)", key, method)
 		}
 		if matchedYear != "" {
@@ -127,7 +127,7 @@ func TestMatchOne(t *testing.T) {
 		byGUID := map[string]PlexEntry{"tvdb://1": {RatingKey: "999", Type: Show}}
 		resolved := map[string]string{"100": "200"}
 		key, method, matchedYear := matchOne(item, "100", resolved, Index{ByGUID: byGUID}, Fallbacks{TitleYear: true, TitleOnly: true})
-		if key != "200" || method != MethodEpisodeGUID {
+		if key != "200" || method != methodEpisodeGUID {
 			t.Errorf("got (%q, %q), want (200, episode-guid)", key, method)
 		}
 		if matchedYear != "" {
@@ -251,7 +251,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		for i := range maxEpisodeGUIDsPerShow + 3 {
 			row := &HistoryItem{
-				RatingKey: FlexInt(i + 1), GrandparentRatingKey: 50, Title: "Ep",
+				RatingKey: flexInt(i + 1), GrandparentRatingKey: 50, Title: "Ep",
 				GrandparentTitle: "Show", Year: 2021, MediaType: "episode",
 				GUID: fmt.Sprintf("plex://episode/%d", i),
 			}
@@ -317,7 +317,7 @@ func TestProcessHistoryRow(t *testing.T) {
 
 	t.Run("duplicate key is not overwritten", func(t *testing.T) {
 		items := map[string]TautulliEntry{
-			"42": {RatingKey: "42", Title: "First", Year: "2020", MediaType: Movie},
+			"42": {Title: "First", Year: "2020", MediaType: Movie},
 		}
 		row := &HistoryItem{
 			RatingKey: 42, Title: "Second",
@@ -341,7 +341,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		}
 	})
 
-	t.Run("episode with zero grandparent FlexInt is skipped", func(t *testing.T) {
+	t.Run("episode with zero grandparent flexInt is skipped", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 0,
@@ -356,7 +356,7 @@ func TestProcessHistoryRow(t *testing.T) {
 
 	t.Run("episode duplicate grandparent not overwritten", func(t *testing.T) {
 		items := map[string]TautulliEntry{
-			"50": {RatingKey: "50", Title: "First Show", Year: "2020", MediaType: Show},
+			"50": {Title: "First Show", Year: "2020", MediaType: Show},
 		}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 50,
@@ -369,7 +369,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		}
 	})
 
-	t.Run("movie with FlexInt rating key", func(t *testing.T) {
+	t.Run("movie with flexInt rating key", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 42, Title: "String Key Movie",
@@ -387,7 +387,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("negative rating key is skipped", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: FlexInt(-1), Title: "Negative Key",
+			RatingKey: flexInt(-1), Title: "Negative Key",
 			Year: 2020, MediaType: "movie",
 		}
 		ProcessHistoryRow(row, items)
@@ -422,7 +422,7 @@ func TestMatchStaleItems(t *testing.T) {
 			}
 		}
 	}
-	matchMethod := func(idx int, method MatchMethod) check {
+	wantMethod := func(idx int, method matchMethod) check {
 		return func(t *testing.T, matched []MatchResult, _ []UnmatchResult) {
 			t.Helper()
 			if idx >= len(matched) {
@@ -468,30 +468,30 @@ func TestMatchStaleItems(t *testing.T) {
 	}{
 		{
 			name:        "guid match takes priority over title+year",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "The Matrix", Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
-			byGUID:      map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Title: "The Matrix", Year: "1999", Type: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "300", Title: "The Matrix", Year: "1999", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "The Matrix", Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
+			byGUID:      map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Year: "1999", Type: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "300", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
-			checks: []check{matchCount(1, 0), matchKey(0, "200"), matchMethod(0, MethodGUID)},
+			checks: []check{matchCount(1, 0), matchKey(0, "200"), wantMethod(0, MethodGUID)},
 		},
 		{
 			name:        "title+year fallback when no guid",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Inception", Year: "2010", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Title: "Inception", Year: "2010", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "Inception", Year: "2010", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Year: "2010", Type: Movie}},
 			enableTY:    true, enableTO: true,
-			checks: []check{matchCount(1, 0), matchKey(0, "200"), matchMethod(0, MethodTitleYear)},
+			checks: []check{matchCount(1, 0), matchKey(0, "200"), wantMethod(0, methodTitleYear)},
 		},
 		{
 			name:     "title-only fallback with matching type",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Dune", Year: "2020", MediaType: Movie}},
-			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Title: "Dune", Year: "2021", Type: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Dune", Year: "2020", MediaType: Movie}},
+			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Year: "2021", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchMethodPrefix(0, "title only")},
 		},
 		{
 			name:     "title-only rejects type mismatch",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Home Alone", Year: "2025", MediaType: Show}},
-			byTitle:  map[string]PlexEntry{titleKey("home alone", Movie): {RatingKey: "200", Title: "Home Alone", Year: "1990", Type: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Home Alone", Year: "2025", MediaType: Show}},
+			byTitle:  map[string]PlexEntry{titleKey("home alone", Movie): {RatingKey: "200", Year: "1990", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
@@ -499,69 +499,69 @@ func TestMatchStaleItems(t *testing.T) {
 			// The title+year lookup key folds in media type, so a stale Movie
 			// can only resolve to a Movie slot.
 			name:        "title+year rejects type mismatch",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Heat", Year: "1995", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("heat", "1995", Show): {RatingKey: "200", Title: "Heat", Year: "1995", Type: Show}},
+			stale:       map[string]TautulliEntry{"100": {Title: "Heat", Year: "1995", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("heat", "1995", Show): {RatingKey: "200", Year: "1995", Type: Show}},
 			enableTY:    true, enableTO: false,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "case insensitive title matching",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "THE MATRIX", Year: "1999", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Title: "The Matrix", Year: "1999", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "THE MATRIX", Year: "1999", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "200")},
 		},
 		{
 			name:     "same key is not remapped",
-			stale:    map[string]TautulliEntry{"200": {RatingKey: "200", Title: "The Matrix", Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
-			byGUID:   map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Title: "The Matrix", Year: "1999", Type: Movie}},
+			stale:    map[string]TautulliEntry{"200": {Title: "The Matrix", Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
+			byGUID:   map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:     "no match produces unmatched",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Nonexistent", Year: "2025", MediaType: Movie, GUID: "imdb://tt0000000"}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Nonexistent", Year: "2025", MediaType: Movie, GUID: "imdb://tt0000000"}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1), unmatchedKey(0, "100")},
 		},
 		{
 			name:        "title+year disabled skips fallback",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Inception", Year: "2010", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Title: "Inception", Year: "2010", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "Inception", Year: "2010", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Year: "2010", Type: Movie}},
 			enableTY:    false, enableTO: false,
 			checks: []check{matchCount(0, 1)},
 		},
 
 		{
 			name:     "title-only disabled skips fallback",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Dune", Year: "2020", MediaType: Movie}},
-			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Title: "Dune", Year: "2021", Type: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Dune", Year: "2020", MediaType: Movie}},
+			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Year: "2021", Type: Movie}},
 			enableTY: true, enableTO: false,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "whitespace-only title does not match",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "   ", Year: "2020", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("", "2020", Movie): {RatingKey: "200", Title: "", Year: "2020", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "   ", Year: "2020", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:     "empty GUID skips GUID matching",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Test", Year: "2020", MediaType: Movie}},
-			byGUID:   map[string]PlexEntry{"": {RatingKey: "200", Title: "Test", Year: "2020", Type: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Test", Year: "2020", MediaType: Movie}},
+			byGUID:   map[string]PlexEntry{"": {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name: "multiple stale items mixed results",
 			stale: map[string]TautulliEntry{
-				"100": {RatingKey: "100", Title: "Movie A", Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"},
-				"200": {RatingKey: "200", Title: "Movie B", Year: "2021", MediaType: Movie, GUID: "imdb://tt2222222"},
-				"300": {RatingKey: "300", Title: "Movie C", Year: "2022", MediaType: Movie, GUID: "imdb://tt3333333"},
+				"100": {Title: "Movie A", Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"},
+				"200": {Title: "Movie B", Year: "2021", MediaType: Movie, GUID: "imdb://tt2222222"},
+				"300": {Title: "Movie C", Year: "2022", MediaType: Movie, GUID: "imdb://tt3333333"},
 			},
-			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "101", Title: "Movie A", Year: "2020", Type: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("movie c", "2022", Movie): {RatingKey: "301", Title: "Movie C", Year: "2022", Type: Movie}},
+			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "101", Year: "2020", Type: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("movie c", "2022", Movie): {RatingKey: "301", Year: "2022", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{
 				matchCount(2, 1),
@@ -570,31 +570,31 @@ func TestMatchStaleItems(t *testing.T) {
 		},
 		{
 			name:        "title with leading trailing whitespace",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "  The Matrix  ", Year: "1999", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Title: "The Matrix", Year: "1999", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "  The Matrix  ", Year: "1999", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "200")},
 		},
 		{
 			name:        "guid match same key falls through to title",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Movie", Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"}},
-			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "100", Title: "Movie", Year: "2020", Type: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("movie", "2020", Movie): {RatingKey: "200", Title: "Movie", Year: "2020", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "Movie", Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"}},
+			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "100", Year: "2020", Type: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("movie", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY:    true, enableTO: true,
-			checks: []check{matchCount(1, 0), matchKey(0, "200"), matchMethod(0, MethodTitleYear)},
+			checks: []check{matchCount(1, 0), matchKey(0, "200"), wantMethod(0, methodTitleYear)},
 		},
 		{
 			name:     "title only same key falls through to unmatched",
-			stale:    map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Unique Movie", Year: "2020", MediaType: Movie}},
-			byTitle:  map[string]PlexEntry{titleKey("unique movie", Movie): {RatingKey: "100", Title: "Unique Movie", Year: "2020", Type: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: "Unique Movie", Year: "2020", MediaType: Movie}},
+			byTitle:  map[string]PlexEntry{titleKey("unique movie", Movie): {RatingKey: "100", Year: "2020", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "title year same key falls through to title only",
-			stale:       map[string]TautulliEntry{"100": {RatingKey: "100", Title: "Dune", Year: "2020", MediaType: Movie}},
-			byTitleYear: map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "100", Title: "Dune", Year: "2020", Type: Movie}},
-			byTitle:     map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Title: "Dune", Year: "2021", Type: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: "Dune", Year: "2020", MediaType: Movie}},
+			byTitleYear: map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "100", Year: "2020", Type: Movie}},
+			byTitle:     map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "300"), matchMethodPrefix(0, "title only")},
 		},
@@ -638,14 +638,14 @@ func TestMatchOne_titleYearTakesPriorityOverTitleOnly(t *testing.T) {
 	// Both indexes hold a valid match; the chain is ordered by increasing
 	// aggressiveness, so title+year must win and title-only must never run.
 	item := &TautulliEntry{Title: "Dune", Year: "2020", MediaType: Movie}
-	byTitleYear := map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "200", Title: "Dune", Year: "2020", Type: Movie}}
-	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Title: "Dune", Year: "2021", Type: Movie}}
+	byTitleYear := map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}}
+	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}}
 	key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitleYear: byTitleYear, ByTitle: byTitle}, Fallbacks{TitleYear: true, TitleOnly: true})
 	if key != "200" {
 		t.Errorf("matchOne key = %q, want 200 (title+year must win over title-only)", key)
 	}
-	if method != MethodTitleYear {
-		t.Errorf("matchOne method = %q, want %q (strategy 2 precedes strategy 3)", method, MethodTitleYear)
+	if method != methodTitleYear {
+		t.Errorf("matchOne method = %q, want %q (strategy 2 precedes strategy 3)", method, methodTitleYear)
 	}
 	if matchedYear != "" {
 		t.Errorf("matchedYear = %q, want empty when title+year wins", matchedYear)
@@ -654,16 +654,16 @@ func TestMatchOne_titleYearTakesPriorityOverTitleOnly(t *testing.T) {
 
 func TestMatchOne_titleOnlyCarriesYearTransition(t *testing.T) {
 	// Title-only is the riskiest strategy and may land on a different year.
-	// Method stays the closed MethodTitleOnly value; drift is carried
+	// Method stays the closed methodTitleOnly value; drift is carried
 	// separately in matchedYear for the operator-facing remap log line.
 	item := &TautulliEntry{Title: "Dune", Year: "1984", MediaType: Movie}
-	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Title: "Dune", Year: "2021", Type: Movie}}
+	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}}
 	key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitle: byTitle}, Fallbacks{TitleYear: true, TitleOnly: true})
 	if key != "300" {
 		t.Errorf("matchOne key = %q, want 300", key)
 	}
-	if method != MethodTitleOnly {
-		t.Errorf("matchOne method = %q, want %q (closed enum, no formatted years)", method, MethodTitleOnly)
+	if method != methodTitleOnly {
+		t.Errorf("matchOne method = %q, want %q (closed enum, no formatted years)", method, methodTitleOnly)
 	}
 	if matchedYear != "2021" {
 		t.Errorf("matchedYear = %q, want 2021 (the matched entry's year)", matchedYear)
@@ -675,7 +675,7 @@ func TestMatchStaleItems_EpisodeGUIDResolution(t *testing.T) {
 	// ahead of any title/year index entry.
 	stale := map[string]TautulliEntry{
 		"100": {
-			RatingKey: "100", Title: "Show", Year: "2021", MediaType: Show,
+			Title: "Show", Year: "2021", MediaType: Show,
 			EpisodeGUIDs: []string{"plex://episode/aaa"},
 		},
 	}
@@ -685,14 +685,14 @@ func TestMatchStaleItems_EpisodeGUIDResolution(t *testing.T) {
 	if len(matched) != 1 || len(unmatched) != 0 {
 		t.Fatalf("matched=%d unmatched=%d, want 1/0", len(matched), len(unmatched))
 	}
-	if matched[0].NewKey != "200" || matched[0].Method != MethodEpisodeGUID {
+	if matched[0].NewKey != "200" || matched[0].Method != methodEpisodeGUID {
 		t.Errorf("got (%q, %q), want (200, episode-guid)", matched[0].NewKey, matched[0].Method)
 	}
 }
 
 // TestProcessHistoryRow_UnknownMediaTypeSkipped pins the fail-open contract:
 // media_type decodes as a plain string, so a row with an unrecognized type
-// ("track") is skipped by ParseMediaType while movie/episode rows in the same
+// ("track") is skipped by parseMediaType while movie/episode rows in the same
 // batch still process.
 func TestProcessHistoryRow_UnknownMediaTypeSkipped(t *testing.T) {
 	items := map[string]TautulliEntry{}

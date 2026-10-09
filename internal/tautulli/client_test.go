@@ -45,7 +45,7 @@ func TestAPI_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "testkey", srv.Client())
-	body, err := c.API(t.Context(), "get_history", nil)
+	body, err := c.call(t.Context(), "get_history", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestAPI_Non200ReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "testkey", srv.Client())
-	_, err := c.API(t.Context(), "get_history", nil)
+	_, err := c.call(t.Context(), "get_history", nil)
 	if err == nil {
 		t.Fatal("expected error for 500 response")
 	}
@@ -81,7 +81,7 @@ func TestAPI_ExtraParams(t *testing.T) {
 
 	c := newTestClient(srv.URL, "k", srv.Client())
 	extra := url.Values{"start": {"100"}}
-	_, err := c.API(t.Context(), "test", extra)
+	_, err := c.call(t.Context(), "test", extra)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestAPI_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	c := newTestClient(srv.URL, "k", srv.Client())
-	_, err := c.API(ctx, "test", nil)
+	_, err := c.call(ctx, "test", nil)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -117,7 +117,7 @@ func TestAPI_NonRetryable4xx(t *testing.T) {
 
 func TestAPI_InvalidURL(t *testing.T) {
 	c := newTestClient("://invalid-url", "key", &http.Client{})
-	_, err := c.API(t.Context(), "test", nil)
+	_, err := c.call(t.Context(), "test", nil)
 	if err == nil {
 		t.Error("expected error for invalid URL")
 	}
@@ -136,7 +136,7 @@ func TestAPI_ExtraCannotOverrideBaseParams(t *testing.T) {
 	// A caller-supplied extra must not clobber the command or the API
 	// credential: requestURL applies cmd/apikey after merging extra.
 	extra := url.Values{"cmd": {"override_cmd"}, "apikey": {"override-key"}}
-	_, err := c.API(t.Context(), "base_cmd", extra)
+	_, err := c.call(t.Context(), "base_cmd", extra)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestAPI_ErrorDoesNotLeakAPIKey(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "supersecretkey123", srv.Client())
-	_, err := c.API(t.Context(), "test", nil)
+	_, err := c.call(t.Context(), "test", nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}

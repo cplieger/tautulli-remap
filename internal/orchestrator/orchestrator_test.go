@@ -114,7 +114,7 @@ func TestCollectTautulliItems_SinglePage(t *testing.T) {
 		}}}`))
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil items")
 	}
@@ -134,7 +134,7 @@ func TestCollectTautulliItems_CapturesEpisodeGUID(t *testing.T) {
 		w.Write([]byte(`{"response":{"result":"success","data":{"recordsFiltered":1,"data":[{"rating_key":99,"grandparent_rating_key":50,"title":"Ep 1","grandparent_title":"Show B","year":2021,"media_type":"episode","guid":"plex://episode/5d9c081be98e47001eb0d74f"}]}}}`))
 	})
 	orch := newOrch(t, cfg)
-	items, captured := orch.CollectTautulliItems(t.Context())
+	items, captured := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil items")
 	}
@@ -165,7 +165,7 @@ func TestCollectTautulliItems_MultiPage(t *testing.T) {
 		}
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil items")
 	}
@@ -182,7 +182,7 @@ func TestCollectTautulliItems_APIError(t *testing.T) {
 		w.Write([]byte(`{"response":{"result":"error","message":"bad request"}}`))
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items != nil {
 		t.Errorf("expected nil on API error, got %v", items)
 	}
@@ -193,7 +193,7 @@ func TestCollectTautulliItems_InvalidJSON(t *testing.T) {
 		w.Write([]byte(`not json`))
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items != nil {
 		t.Errorf("expected nil on invalid JSON, got %v", items)
 	}
@@ -204,7 +204,7 @@ func TestCollectTautulliItems_EmptyData(t *testing.T) {
 		w.Write([]byte(`{"response":{"result":"success","data":{"recordsFiltered":0,"data":[]}}}`))
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil map")
 	}
@@ -218,7 +218,7 @@ func TestCollectTautulliItems_HTTPFailure(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items != nil {
 		t.Errorf("expected nil on HTTP failure, got %v", items)
 	}
@@ -232,7 +232,7 @@ func TestCollectTautulliItems_ExceedsMaxRecords(t *testing.T) {
 		}}}`))
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items != nil {
 		t.Errorf("expected nil when records exceed cap, got %d items", len(items))
 	}
@@ -253,7 +253,7 @@ func TestCollectTautulliItems_ExactPageBoundary(t *testing.T) {
 		}
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil items")
 	}
@@ -283,7 +283,7 @@ func TestCollectTautulliItems_PaginationIncrement(t *testing.T) {
 		}
 	})
 	orch := newOrch(t, cfg)
-	items, _ := orch.CollectTautulliItems(t.Context())
+	items, _ := orch.collectTautulliItems(t.Context())
 	if items == nil {
 		t.Fatal("expected non-nil items")
 	}
@@ -313,7 +313,7 @@ func TestCollectTautulliItems_CancelDuringPagination(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	orch.PaginationDelay = 200 * time.Millisecond
-	items, _ := orch.CollectTautulliItems(ctx)
+	items, _ := orch.collectTautulliItems(ctx)
 	if items != nil {
 		t.Errorf("expected nil on ctx cancel during pagination, got %d items", len(items))
 	}
@@ -332,10 +332,10 @@ func TestFindStaleKeys_IdentifiesStaleAndValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"42":  {RatingKey: "42", Title: "Valid", MediaType: remap.Movie},
-		"999": {RatingKey: "999", Title: "Stale", MediaType: remap.Movie},
+		"42":  {Title: "Valid", MediaType: remap.Movie},
+		"999": {Title: "Stale", MediaType: remap.Movie},
 	}
-	stale, err := orch.FindStaleKeys(t.Context(), items)
+	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -353,9 +353,9 @@ func TestFindStaleKeys_AllValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {RatingKey: "1", Title: "A", MediaType: remap.Movie},
+		"1": {Title: "A", MediaType: remap.Movie},
 	}
-	stale, err := orch.FindStaleKeys(t.Context(), items)
+	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -372,9 +372,9 @@ func TestFindStaleKeys_CancelledContext(t *testing.T) {
 	cancel()
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {RatingKey: "1", Title: "A", MediaType: remap.Movie},
+		"1": {Title: "A", MediaType: remap.Movie},
 	}
-	_, _ = orch.FindStaleKeys(ctx, items)
+	_, _ = orch.findStaleKeys(ctx, items)
 }
 
 func TestFindStaleKeys_ProgressLogBoundary(t *testing.T) {
@@ -385,9 +385,9 @@ func TestFindStaleKeys_ProgressLogBoundary(t *testing.T) {
 	items := map[string]remap.TautulliEntry{}
 	for i := 1; i <= 250; i++ {
 		k := strconv.Itoa(i)
-		items[k] = remap.TautulliEntry{RatingKey: k, Title: "M", MediaType: remap.Movie}
+		items[k] = remap.TautulliEntry{Title: "M", MediaType: remap.Movie}
 	}
-	stale, err := orch.FindStaleKeys(t.Context(), items)
+	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -439,25 +439,25 @@ func TestBuildPlexIndex_AllThreeIndexes(t *testing.T) {
 	}
 	// These assertions omit remap's private key encoding; they only check
 	// that both a movie and a show got indexed into all three maps.
-	if !hasIndexedEntry(idx.ByTitleYear, "The Matrix", "1999", remap.Movie) {
+	if !hasIndexedEntry(idx.ByTitleYear, "42", "1999", remap.Movie) {
 		t.Error("expected the movie (The Matrix, 1999) in idx.ByTitleYear")
 	}
-	if !hasIndexedEntry(idx.ByTitleYear, "Breaking Bad", "2008", remap.Show) {
+	if !hasIndexedEntry(idx.ByTitleYear, "99", "2008", remap.Show) {
 		t.Error("expected the show (Breaking Bad, 2008) in idx.ByTitleYear")
 	}
-	if !hasIndexedEntry(idx.ByTitle, "The Matrix", "1999", remap.Movie) {
+	if !hasIndexedEntry(idx.ByTitle, "42", "1999", remap.Movie) {
 		t.Error("expected the movie (The Matrix) in idx.ByTitle")
 	}
-	if !hasIndexedEntry(idx.ByTitle, "Breaking Bad", "2008", remap.Show) {
+	if !hasIndexedEntry(idx.ByTitle, "99", "2008", remap.Show) {
 		t.Error("expected the show (Breaking Bad) in idx.ByTitle")
 	}
 }
 
 // hasIndexedEntry reports whether an index map holds an entry for the given
-// title, year and media type, without depending on remap's key encoding.
-func hasIndexedEntry(index map[string]remap.PlexEntry, title, year string, mediaType remap.MediaType) bool {
+// rating key, year and media type, without depending on remap's key encoding.
+func hasIndexedEntry(index map[string]remap.PlexEntry, ratingKey, year string, mediaType remap.MediaType) bool {
 	for _, e := range index {
-		if e.Title.Raw() == title && e.Year == year && e.Type == mediaType {
+		if e.RatingKey == ratingKey && e.Year == year && e.Type == mediaType {
 			return true
 		}
 	}
@@ -528,7 +528,7 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 	matched := []remap.MatchResult{
 		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	orch.ApplyRemappings(t.Context(), matched, nil)
+	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 0 {
 		t.Errorf("expected 0 API calls in dry run, got %d", calls)
 	}
@@ -562,7 +562,7 @@ func TestApplyRemappings_DryRunPreviewLoggedAtInfo(t *testing.T) {
 	matched := []remap.MatchResult{
 		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	o.ApplyRemappings(t.Context(), matched, nil)
+	o.applyRemappings(t.Context(), matched, nil)
 
 	out := buf.String()
 	if !strings.Contains(out, "msg=remap") {
@@ -590,7 +590,7 @@ func TestApplyRemappings_LiveRemap(t *testing.T) {
 	matched := []remap.MatchResult{
 		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	orch.ApplyRemappings(t.Context(), matched, nil)
+	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 1 {
 		t.Errorf("expected 1 API call, got %d", calls)
 	}
@@ -605,7 +605,7 @@ func TestApplyRemappings_APIError(t *testing.T) {
 	matched := []remap.MatchResult{
 		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	updated, failed, aborted := orch.ApplyRemappings(t.Context(), matched, nil)
+	updated, failed, aborted := orch.applyRemappings(t.Context(), matched, nil)
 	if updated != 0 {
 		t.Errorf("updated = %d, want 0 (the only remap failed)", updated)
 	}
@@ -622,7 +622,7 @@ func TestApplyRemappings_EmptyMatched(t *testing.T) {
 		t.Error("should not call API with empty matched")
 	})
 	orch := newOrch(t, cfg)
-	orch.ApplyRemappings(t.Context(), nil, nil)
+	orch.applyRemappings(t.Context(), nil, nil)
 }
 
 func TestApplyRemappings_CancelledContext(t *testing.T) {
@@ -639,7 +639,7 @@ func TestApplyRemappings_CancelledContext(t *testing.T) {
 		{Title: "A", OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
 		{Title: "B", OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	orch.ApplyRemappings(ctx, matched, nil)
+	orch.applyRemappings(ctx, matched, nil)
 	if calls > 1 {
 		t.Errorf("expected at most 1 call with cancelled context, got %d", calls)
 	}
@@ -661,7 +661,7 @@ func TestApplyRemappings_AbortsAfterConsecutiveFailures(t *testing.T) {
 			MediaType: remap.Movie, Method: remap.MethodGUID,
 		}
 	}
-	updated, failed, aborted := orch.ApplyRemappings(t.Context(), matched, nil)
+	updated, failed, aborted := orch.applyRemappings(t.Context(), matched, nil)
 	if updated != 0 {
 		t.Errorf("updated = %d, want 0", updated)
 	}
@@ -683,8 +683,8 @@ func TestClearRecentlyAdded_DryRun(t *testing.T) {
 	})
 	cfg.DryRun = true
 	orch := newOrch(t, cfg)
-	if !orch.ClearRecentlyAdded(t.Context()) {
-		t.Error("ClearRecentlyAdded() = false in dry run, want true (nothing to fail)")
+	if !orch.clearRecentlyAdded(t.Context()) {
+		t.Error("clearRecentlyAdded() = false in dry run, want true (nothing to fail)")
 	}
 	if calls != 0 {
 		t.Errorf("expected 0 API calls in dry run, got %d", calls)
@@ -702,8 +702,8 @@ func TestClearRecentlyAdded_Live(t *testing.T) {
 	})
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
-	if !orch.ClearRecentlyAdded(t.Context()) {
-		t.Error("ClearRecentlyAdded() = false, want true on a successful clear")
+	if !orch.clearRecentlyAdded(t.Context()) {
+		t.Error("clearRecentlyAdded() = false, want true on a successful clear")
 	}
 	if calls != 1 {
 		t.Errorf("expected 1 API call, got %d", calls)
@@ -716,8 +716,8 @@ func TestClearRecentlyAdded_HTTPError(t *testing.T) {
 	})
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
-	if orch.ClearRecentlyAdded(t.Context()) {
-		t.Error("ClearRecentlyAdded() = true, want false when the API call fails (incomplete cleanup must be reported)")
+	if orch.clearRecentlyAdded(t.Context()) {
+		t.Error("clearRecentlyAdded() = true, want false when the API call fails (incomplete cleanup must be reported)")
 	}
 }
 
@@ -1171,9 +1171,9 @@ func TestFindStaleKeys_PlexErrorAborts(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {RatingKey: "1", Title: "A", MediaType: remap.Movie},
+		"1": {Title: "A", MediaType: remap.Movie},
 	}
-	stale, err := orch.FindStaleKeys(t.Context(), items)
+	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err == nil {
 		t.Error("expected non-nil error when Plex returns 500 during the stale-key check")
 	}
@@ -1498,7 +1498,7 @@ func TestApplyRemappings_ShutdownDuringUpdateIsNotAFailure(t *testing.T) {
 		{Title: "A", OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
 		{Title: "B", OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
-	updated, failed, aborted := o.ApplyRemappings(ctx, matched, nil)
+	updated, failed, aborted := o.applyRemappings(ctx, matched, nil)
 	if updated != 0 {
 		t.Errorf("updated = %d, want 0 (the update was interrupted by shutdown, not completed)", updated)
 	}
@@ -1560,10 +1560,10 @@ func (f *resolveFakePlex) ResolveEpisodeShow(ctx context.Context, guid string) (
 
 func TestResolveStaleShows(t *testing.T) {
 	stale := map[string]remap.TautulliEntry{
-		"10": {RatingKey: "10", MediaType: remap.Show, EpisodeGUIDs: []string{"plex://episode/a"}},
-		"20": {RatingKey: "20", MediaType: remap.Movie, GUID: "imdb://tt1"},                        // movie: skipped
-		"30": {RatingKey: "30", MediaType: remap.Show},                                             // show, no episode GUIDs: skipped
-		"40": {RatingKey: "40", MediaType: remap.Show, EpisodeGUIDs: []string{"plex://episode/d"}}, // resolves to itself
+		"10": {MediaType: remap.Show, EpisodeGUIDs: []string{"plex://episode/a"}},
+		"20": {MediaType: remap.Movie, GUID: "imdb://tt1"},                        // movie: skipped
+		"30": {MediaType: remap.Show},                                             // show, no episode GUIDs: skipped
+		"40": {MediaType: remap.Show, EpisodeGUIDs: []string{"plex://episode/d"}}, // resolves to itself
 	}
 	fp := &resolveFakePlex{resolve: func(_ context.Context, guid string) (string, error) {
 		switch guid {
