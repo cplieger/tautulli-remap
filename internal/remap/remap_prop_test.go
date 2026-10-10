@@ -101,20 +101,20 @@ func TestMatchStaleItems_partition_property(t *testing.T) {
 			if rapid.Bool().Draw(t, fmt.Sprintf("has_guid_%d", i)) {
 				guid = "imdb://tt" + strconv.Itoa(rapid.IntRange(1000000, 9999999).Draw(t, fmt.Sprintf("guid_%d", i)))
 			}
-			stale[key] = TautulliEntry{RatingKey: key, Title: title, Year: year, MediaType: mediaType, GUID: guid}
+			stale[key] = TautulliEntry{Title: title, Year: year, MediaType: mediaType, GUID: guid}
 
 			if guid != "" && rapid.Bool().Draw(t, fmt.Sprintf("in_guid_map_%d", i)) {
 				newKey := strconv.Itoa(200 + i)
-				byGUID[guid] = PlexEntry{RatingKey: newKey, Title: title, Year: year, Type: mediaType}
+				byGUID[guid] = PlexEntry{RatingKey: newKey, Year: year, Type: mediaType}
 			}
 			t2 := strings.ToLower(strings.TrimSpace(title.Raw()))
 			if t2 != "" && rapid.Bool().Draw(t, fmt.Sprintf("in_ty_map_%d", i)) {
 				newKey := strconv.Itoa(300 + i)
-				byTitleYear[titleYearKey(t2, year, mediaType)] = PlexEntry{RatingKey: newKey, Title: title, Year: year, Type: mediaType}
+				byTitleYear[titleYearKey(t2, year, mediaType)] = PlexEntry{RatingKey: newKey, Year: year, Type: mediaType}
 			}
 			if t2 != "" && rapid.Bool().Draw(t, fmt.Sprintf("in_t_map_%d", i)) {
 				newKey := strconv.Itoa(400 + i)
-				byTitle[titleKey(t2, mediaType)] = PlexEntry{RatingKey: newKey, Title: title, Year: year, Type: mediaType}
+				byTitle[titleKey(t2, mediaType)] = PlexEntry{RatingKey: newKey, Year: year, Type: mediaType}
 			}
 		}
 
@@ -158,7 +158,7 @@ func TestProcessHistoryRow_never_removes_entries(t *testing.T) {
 		nExisting := rapid.IntRange(0, 5).Draw(t, "n_existing")
 		for i := range nExisting {
 			key := strconv.Itoa(i + 1)
-			items[key] = TautulliEntry{RatingKey: key, Title: runesafe.Untrusted(fmt.Sprintf("Existing %d", i)), Year: "2020", MediaType: Movie}
+			items[key] = TautulliEntry{Title: runesafe.Untrusted(fmt.Sprintf("Existing %d", i)), Year: "2020", MediaType: Movie}
 		}
 		beforeLen := len(items)
 		beforeKeys := map[string]runesafe.Untrusted{}
@@ -168,11 +168,11 @@ func TestProcessHistoryRow_never_removes_entries(t *testing.T) {
 
 		mediaType := rapid.SampledFrom([]string{"movie", "episode", "track", ""}).Draw(t, "media_type")
 		row := &HistoryItem{
-			RatingKey:            FlexInt(rapid.IntRange(-1, 10).Draw(t, "rk")),
-			GrandparentRatingKey: FlexInt(rapid.IntRange(-1, 10).Draw(t, "grk")),
+			RatingKey:            flexInt(rapid.IntRange(-1, 10).Draw(t, "rk")),
+			GrandparentRatingKey: flexInt(rapid.IntRange(-1, 10).Draw(t, "grk")),
 			Title:                runesafe.Untrusted(rapid.StringMatching(`[A-Za-z ]{0,15}`).Draw(t, "title")),
 			GrandparentTitle:     runesafe.Untrusted(rapid.StringMatching(`[A-Za-z ]{0,15}`).Draw(t, "gp_title")),
-			Year:                 FlexInt(rapid.IntRange(2000, 2025).Draw(t, "year")),
+			Year:                 flexInt(rapid.IntRange(2000, 2025).Draw(t, "year")),
 			MediaType:            mediaType,
 			GUID:                 rapid.SampledFrom([]string{"", "imdb://tt1234567", "plex://episode/abc", "local://123"}).Draw(t, "guid"),
 		}
@@ -193,10 +193,10 @@ func TestProcessHistoryRow_never_removes_entries(t *testing.T) {
 func TestNormalizeTitle_idempotent(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		s := rapid.String().Draw(t, "s")
-		once := NormalizeTitle(s)
-		twice := NormalizeTitle(once)
+		once := normalizeTitle(s)
+		twice := normalizeTitle(once)
 		if once != twice {
-			t.Errorf("NormalizeTitle not idempotent: NormalizeTitle(%q)=%q, NormalizeTitle(%q)=%q", s, once, once, twice)
+			t.Errorf("normalizeTitle not idempotent: normalizeTitle(%q)=%q, normalizeTitle(%q)=%q", s, once, once, twice)
 		}
 	})
 }

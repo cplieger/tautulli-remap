@@ -39,8 +39,8 @@ type Client struct {
 	RetryDelayUnit time.Duration
 }
 
-// HistoryResponse represents the JSON envelope for get_history.
-type HistoryResponse struct {
+// historyResponse represents the JSON envelope for get_history.
+type historyResponse struct {
 	Response struct {
 		Result  string `json:"result"`
 		Message string `json:"message"`
@@ -51,8 +51,8 @@ type HistoryResponse struct {
 	} `json:"response"`
 }
 
-// Result represents a generic Tautulli API result envelope.
-type Result struct {
+// resultEnvelope represents a generic Tautulli API result envelope.
+type resultEnvelope struct {
 	Response struct {
 		Result  string `json:"result"`
 		Message string `json:"message"`
@@ -92,11 +92,11 @@ func (c *Client) requestURL(cmd string, extra url.Values) string {
 	return c.url + "/api/v2?" + params.Encode()
 }
 
-// API executes a single Tautulli API v2 GET command and returns the raw
+// call executes a single Tautulli API v2 GET command and returns the raw
 // response body. The API key is embedded in the query string and redacted
 // from any transport error. Callers that need retry logic should use
 // APIWithRetry instead.
-func (c *Client) API(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
+func (c *Client) call(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
@@ -125,7 +125,7 @@ func (c *Client) API(ctx context.Context, cmd string, extra url.Values) ([]byte,
 // github.com/cplieger/httpx. 4xx-other-than-429 and non-transient transport
 // errors are returned immediately. The api key (carried in the query string)
 // is redacted from any returned error. Used for read commands; mutating
-// commands call API directly so they are never retried.
+// commands use call directly so they are never retried.
 func (c *Client) APIWithRetry(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
 	body, err := httpx.GetBytes(ctx, c.httpClient, c.requestURL(cmd, extra),
 		httpx.WithMaxAttempts(3),
@@ -146,7 +146,7 @@ func (c *Client) GetHistory(ctx context.Context, params url.Values) (*HistoryPag
 	if err != nil {
 		return nil, err
 	}
-	var resp HistoryResponse
+	var resp historyResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("parsing history: %w", err)
 	}
@@ -162,7 +162,7 @@ func (c *Client) GetHistory(ctx context.Context, params url.Values) (*HistoryPag
 // checkResult unmarshals a generic Tautulli result envelope and returns an
 // error if the API reported anything other than success.
 func checkResult(body []byte, cmd string) error {
-	var resp Result
+	var resp resultEnvelope
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("parsing %s: %w", cmd, err)
 	}
@@ -180,7 +180,7 @@ func (c *Client) UpdateMetadata(ctx context.Context, oldKey, newKey string, medi
 		"new_rating_key": {newKey},
 		"media_type":     {string(mediaType)},
 	}
-	body, err := c.API(ctx, "update_metadata_details", params)
+	body, err := c.call(ctx, "update_metadata_details", params)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (c *Client) UpdateMetadata(ctx context.Context, oldKey, newKey string, medi
 // stale entries a remap leaves behind. Tautulli repopulates it from Plex
 // activity.
 func (c *Client) DeleteRecentlyAdded(ctx context.Context) error {
-	body, err := c.API(ctx, "delete_recently_added", nil)
+	body, err := c.call(ctx, "delete_recently_added", nil)
 	if err != nil {
 		return err
 	}

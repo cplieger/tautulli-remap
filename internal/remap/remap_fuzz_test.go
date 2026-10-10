@@ -18,7 +18,7 @@ func FuzzFlexIntUnmarshal(f *testing.F) {
 	f.Add([]byte(`"abc"`))
 	f.Add([]byte(`99999999999999999`))
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var fi FlexInt
+		var fi flexInt
 		if err := fi.UnmarshalJSON(data); err != nil {
 			return
 		}
@@ -30,7 +30,7 @@ func FuzzFlexIntUnmarshal(f *testing.F) {
 			if err != nil {
 				t.Fatalf("marshal failed: %v", err)
 			}
-			var fi2 FlexInt
+			var fi2 flexInt
 			if err := fi2.UnmarshalJSON(out); err != nil {
 				t.Fatalf("re-unmarshal failed: %v", err)
 			}
@@ -122,13 +122,9 @@ func FuzzProcessHistoryRow(f *testing.F) {
 		// Validate outputs
 		canonicalPrefixes := []string{"imdb://", "tmdb://", "tvdb://", "plex://", "mbid://"}
 		for key, entry := range items {
-			// RatingKey must be non-zero positive
 			rk, err := strconv.Atoi(key)
 			if err != nil || rk <= 0 {
 				t.Errorf("invalid rating key %q in output", key)
-			}
-			if entry.RatingKey != key {
-				t.Errorf("entry.RatingKey=%q != map key=%q", entry.RatingKey, key)
 			}
 			// MediaType must be Movie or Show
 			if entry.MediaType != Movie && entry.MediaType != Show {
@@ -163,23 +159,22 @@ func FuzzMatchOne(f *testing.F) {
 	// not only under coverage-guided fuzzing.
 	f.Add("Show Title", "tvdb://12345", "movie")
 	f.Fuzz(func(t *testing.T, title, guid, mediaType string) {
-		mt := ParseMediaType(mediaType)
+		mt := parseMediaType(mediaType)
 		item := &TautulliEntry{
-			RatingKey: "100",
 			Title:     runesafe.Untrusted(title),
 			Year:      "2020",
 			MediaType: mt,
 			GUID:      guid,
 		}
 		byGUID := map[string]PlexEntry{
-			"imdb://tt1234567": {RatingKey: "200", Title: "M", Year: "2020", Type: Movie},
-			"tvdb://12345":     {RatingKey: "300", Title: "S", Year: "2021", Type: Show},
+			"imdb://tt1234567": {RatingKey: "200", Year: "2020", Type: Movie},
+			"tvdb://12345":     {RatingKey: "300", Year: "2021", Type: Show},
 		}
 		byTitleYear := map[string]PlexEntry{
-			titleYearKey("test movie", "2020", Movie): {RatingKey: "400", Title: "Test Movie", Year: "2020", Type: Movie},
+			titleYearKey("test movie", "2020", Movie): {RatingKey: "400", Year: "2020", Type: Movie},
 		}
 		byTitle := map[string]PlexEntry{
-			titleKey("show title", Show): {RatingKey: "500", Title: "Show Title", Year: "2021", Type: Show},
+			titleKey("show title", Show): {RatingKey: "500", Year: "2021", Type: Show},
 		}
 		validKeys := map[string]bool{"200": true, "300": true, "400": true, "500": true}
 
@@ -204,10 +199,10 @@ func FuzzMatchOne(f *testing.F) {
 		}
 		// matchedYear is set only by title-only matches, and always to the
 		// matched entry's own year.
-		if matchedYear != "" && method != MethodTitleOnly {
+		if matchedYear != "" && method != methodTitleOnly {
 			t.Errorf("matchedYear %q set by non-title-only method %q", matchedYear, method)
 		}
-		if method == MethodTitleOnly && matchedYear != byTitle[titleKey(NormalizeTitle(item.Title.Raw()), item.MediaType)].Year {
+		if method == methodTitleOnly && matchedYear != byTitle[titleKey(normalizeTitle(item.Title.Raw()), item.MediaType)].Year {
 			t.Errorf("matchedYear %q does not carry the matched entry's year", matchedYear)
 		}
 	})

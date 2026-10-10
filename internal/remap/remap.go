@@ -15,7 +15,7 @@ const maxEpisodeGUIDsPerShow = 5
 // NormalizeGUID extracts a canonical ID from a Plex GUID string.
 // Returns empty string for unsupported formats.
 func NormalizeGUID(guid string) string {
-	for _, m := range GUIDMappings {
+	for _, m := range guidMappings {
 		if !strings.Contains(guid, m.Source) {
 			continue
 		}
@@ -67,12 +67,12 @@ func matchOne(
 	resolved map[string]string,
 	idx Index,
 	fb Fallbacks,
-) (newKey string, method MatchMethod, matchedYear string) {
+) (newKey string, method matchMethod, matchedYear string) {
 	// Strategy 0: episode-GUID resolution (shows only). The orchestrator has
 	// already resolved one of this stale show's watched episode GUIDs against
 	// Plex; prefer that exact result over any title/year heuristic.
 	if rk, ok := resolved[oldKey]; ok && rk != oldKey {
-		return rk, MethodEpisodeGUID, ""
+		return rk, methodEpisodeGUID, ""
 	}
 
 	// Strategy 1: match by GUID. Index.ByGUID is not type-keyed (TMDB movies
@@ -99,21 +99,21 @@ func matchByTitle(
 	oldKey string,
 	idx Index,
 	fb Fallbacks,
-) (newKey string, method MatchMethod, matchedYear string) {
-	normalizedTitle := NormalizeTitle(item.Title.Raw())
+) (newKey string, method matchMethod, matchedYear string) {
+	normalizedTitle := normalizeTitle(item.Title.Raw())
 	if normalizedTitle == "" {
 		return "", "", ""
 	}
 
 	if fb.TitleYear {
 		if pe, ok := idx.ByTitleYear[titleYearKey(normalizedTitle, item.Year, item.MediaType)]; ok && pe.RatingKey != oldKey {
-			return pe.RatingKey, MethodTitleYear, ""
+			return pe.RatingKey, methodTitleYear, ""
 		}
 	}
 
 	if fb.TitleOnly {
 		if pe, ok := idx.ByTitle[titleKey(normalizedTitle, item.MediaType)]; ok && pe.RatingKey != oldKey {
-			return pe.RatingKey, MethodTitleOnly, pe.Year
+			return pe.RatingKey, methodTitleOnly, pe.Year
 		}
 	}
 
@@ -161,7 +161,7 @@ func ProcessHistoryRow(row *HistoryItem, items map[string]TautulliEntry) bool {
 	year := strconv.Itoa(int(row.Year))
 	guid := NormalizeGUID(row.GUID)
 
-	switch ParseMediaType(row.MediaType) {
+	switch parseMediaType(row.MediaType) {
 	case Movie:
 		ratingKey := int(row.RatingKey)
 		if ratingKey <= 0 {
@@ -170,11 +170,10 @@ func ProcessHistoryRow(row *HistoryItem, items map[string]TautulliEntry) bool {
 		key := strconv.Itoa(ratingKey)
 		if _, ok := items[key]; !ok {
 			items[key] = TautulliEntry{
-				RatingKey: key, Title: row.Title,
-				Year: year, MediaType: Movie, GUID: guid,
+				Title: row.Title, Year: year, MediaType: Movie, GUID: guid,
 			}
 		}
-	case Episode:
+	case episode:
 		grandparentRatingKey := int(row.GrandparentRatingKey)
 		if grandparentRatingKey <= 0 {
 			return false
@@ -207,7 +206,7 @@ func upsertShow(items map[string]TautulliEntry, key string, row *HistoryItem, ye
 		if title == "" {
 			title = row.Title
 		}
-		entry = TautulliEntry{RatingKey: key, Title: title, Year: year, MediaType: Show, GUID: showGUID}
+		entry = TautulliEntry{Title: title, Year: year, MediaType: Show, GUID: showGUID}
 	} else if entry.GUID == "" && showGUID != "" {
 		entry.GUID = showGUID
 	}
