@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/plex"
 	"github.com/cplieger/tautulli-remap/internal/remap"
