@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/keyenc"
+	"github.com/cplieger/runesafe/v3"
 )
 
 // collidingFetcher returns its sections and per-section items verbatim, so a test can place two
@@ -83,11 +84,11 @@ func TestCaptureLogs_restoresLogPackage(t *testing.T) {
 
 func TestBuildPlexIndex_TitleYearCollisionRefusesToMatch(t *testing.T) {
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0001"}},
-				{RatingKey: 2, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0002"}},
+				{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0001"}},
+				{RatingKey: 2, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0002"}},
 			},
 		},
 	}
@@ -126,11 +127,11 @@ func TestBuildPlexIndex_TitleYearCollisionRefusesToMatch(t *testing.T) {
 
 func TestBuildPlexIndex_SameKeyReindexedNoShadow(t *testing.T) {
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 7, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt1"}},
-				{RatingKey: 7, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt1"}},
+				{RatingKey: 7, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt1"}},
+				{RatingKey: 7, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt1"}},
 			},
 		},
 	}
@@ -181,11 +182,11 @@ func (listErrorFetcher) LibraryAll(_ context.Context, _ string) ([]LibItem, erro
 func TestBuildPlexIndex_ReportsFailedSections(t *testing.T) {
 	fetcher := &failingFetcher{
 		sections: []Section{
-			{Key: "1", Title: "Movies", Type: "movie"},
-			{Key: "2", Title: "Movies 4K", Type: "movie"},
+			{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"},
+			{Key: "2", Title: runesafe.NewUntrusted("Movies 4K"), Type: "movie"},
 		},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0001"}}},
+			"1": {{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0001"}}},
 		},
 		failSection: "2",
 	}
@@ -213,11 +214,11 @@ func TestBuildPlexIndex_SectionListError(t *testing.T) {
 
 func TestBuildPlexIndex_GUIDCollisionRefusesToMatch(t *testing.T) {
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0113277"}},
-				{RatingKey: 2, Title: "Heat 4K", Year: 1995, GUIDs: []string{"imdb://tt0113277"}},
+				{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}},
+				{RatingKey: 2, Title: runesafe.NewUntrusted("Heat 4K"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}},
 			},
 		},
 	}
@@ -244,9 +245,9 @@ func TestBuildPlexIndex_GUIDCollisionRefusesToMatch(t *testing.T) {
 
 func TestBuildPlexIndex_ParallelismBelowOneStillIndexes(t *testing.T) {
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
+			"1": {{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
 		},
 	}
 
@@ -283,9 +284,9 @@ func TestBuildPlexIndex_CancelledBeforeScanIsNotAFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
+			"1": {{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
 		},
 	}
 	idx, failed := BuildPlexIndex(ctx, fetcher, 1)
@@ -300,7 +301,7 @@ func TestBuildPlexIndex_CancelledBeforeScanIsNotAFailure(t *testing.T) {
 func TestBuildPlexIndex_CancelledMidFetchIsNotAFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	fetcher := &cancelOnFetchFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		cancel:   cancel,
 	}
 	_, failed := BuildPlexIndex(ctx, fetcher, 1)
@@ -312,12 +313,12 @@ func TestBuildPlexIndex_CancelledMidFetchIsNotAFailure(t *testing.T) {
 func TestBuildPlexIndex_SkipsNonMovieShowSections(t *testing.T) {
 	fetcher := &collidingFetcher{
 		sections: []Section{
-			{Key: "1", Title: "Movies", Type: "movie"},
-			{Key: "2", Title: "Music", Type: "artist"},
+			{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"},
+			{Key: "2", Title: runesafe.NewUntrusted("Music"), Type: "artist"},
 		},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
-			"2": {{RatingKey: 9, Title: "Some Album", Year: 2001, GUIDs: []string{"mbid://abc"}}},
+			"1": {{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
+			"2": {{RatingKey: 9, Title: runesafe.NewUntrusted("Some Album"), Year: 2001, GUIDs: []string{"mbid://abc"}}},
 		},
 	}
 	idx, failed := BuildPlexIndex(t.Context(), fetcher, 1)
@@ -348,11 +349,11 @@ func TestBuildPlexIndex_TitleOnlyCollisionKeepsTitleYearMatchable(t *testing.T) 
 	// are independent -- a collision in the less-specific title index must not
 	// poison the more-specific title+year index.
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 1, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt1"}},
-				{RatingKey: 2, Title: "Dune", Year: 1984, GUIDs: []string{"imdb://tt2"}},
+				{RatingKey: 1, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt1"}},
+				{RatingKey: 2, Title: runesafe.NewUntrusted("Dune"), Year: 1984, GUIDs: []string{"imdb://tt2"}},
 			},
 		},
 	}
@@ -387,12 +388,12 @@ func TestMatch_CrossTypeSameTitleYear_RecoversMovieMatch(t *testing.T) {
 	// now matches the Movie (key 10) and never the Show.
 	fetcher := &collidingFetcher{
 		sections: []Section{
-			{Key: "1", Title: "Movies", Type: "movie"},
-			{Key: "2", Title: "Shows", Type: "show"},
+			{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"},
+			{Key: "2", Title: runesafe.NewUntrusted("Shows"), Type: "show"},
 		},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 10, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt-movie"}}},
-			"2": {{RatingKey: 20, Title: "Dune", Year: 2021, GUIDs: []string{"tvdb://show"}}},
+			"1": {{RatingKey: 10, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt-movie"}}},
+			"2": {{RatingKey: 20, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"tvdb://show"}}},
 		},
 	}
 
@@ -411,7 +412,7 @@ func TestMatch_CrossTypeSameTitleYear_RecoversMovieMatch(t *testing.T) {
 	// Stale Movie whose GUID no longer resolves (absent from idx.ByGUID) falls back
 	// to title+year and must land on the Movie, not the Show.
 	stale := map[string]TautulliEntry{
-		"99": {Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
+		"99": {Title: runesafe.NewUntrusted("Dune"), Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
 	}
 	matched, unmatched := MatchStaleItems(stale, nil, idx, Fallbacks{TitleYear: true, TitleOnly: false})
 	if len(matched) != 1 || len(unmatched) != 0 {
@@ -431,11 +432,11 @@ func TestMatch_SameTypeTitleYearTwin_StillRefusesToMatch(t *testing.T) {
 	// stays pruned and a stale Movie "Dune" 2021 remains unmatched. Folding the
 	// media type into the key must not weaken same-type ambiguity detection.
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 10, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt-a"}},
-				{RatingKey: 11, Title: "Dune", Year: 2021, GUIDs: []string{"imdb://tt-b"}},
+				{RatingKey: 10, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt-a"}},
+				{RatingKey: 11, Title: runesafe.NewUntrusted("Dune"), Year: 2021, GUIDs: []string{"imdb://tt-b"}},
 			},
 		},
 	}
@@ -449,7 +450,7 @@ func TestMatch_SameTypeTitleYearTwin_StillRefusesToMatch(t *testing.T) {
 	}
 
 	stale := map[string]TautulliEntry{
-		"99": {Title: "Dune", Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
+		"99": {Title: runesafe.NewUntrusted("Dune"), Year: "2021", MediaType: Movie, GUID: "imdb://stale-gone"},
 	}
 	matched, unmatched := MatchStaleItems(stale, nil, idx, Fallbacks{TitleYear: true, TitleOnly: false})
 	if len(matched) != 0 || len(unmatched) != 1 {
@@ -468,12 +469,12 @@ func TestBuildPlexIndex_CrossSectionGUIDCollisionRefusesToMatch(t *testing.T) {
 	// keep the collision isolated to idx.ByGUID.
 	fetcher := &collidingFetcher{
 		sections: []Section{
-			{Key: "1", Title: "Movies", Type: "movie"},
-			{Key: "2", Title: "Movies 4K", Type: "movie"},
+			{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"},
+			{Key: "2", Title: runesafe.NewUntrusted("Movies 4K"), Type: "movie"},
 		},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
-			"2": {{RatingKey: 2, Title: "Heat 4K", Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
+			"1": {{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
+			"2": {{RatingKey: 2, Title: runesafe.NewUntrusted("Heat 4K"), Year: 1995, GUIDs: []string{"imdb://tt0113277"}}},
 		},
 	}
 	idx, failed := BuildPlexIndex(t.Context(), fetcher, 2)
@@ -493,11 +494,11 @@ func TestBuildPlexIndex_AnnouncesRefusalSummaryWhenKeysAreAmbiguous(t *testing.T
 	// is distinct from the per-collision shadow lines and is the only signal
 	// that surfaces the aggregate refusal counts.
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0001"}},
-				{RatingKey: 2, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0002"}},
+				{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0001"}},
+				{RatingKey: 2, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0002"}},
 			},
 		},
 	}
@@ -516,11 +517,11 @@ func TestBuildPlexIndex_OmitsRefusalSummaryWhenNoKeysAreAmbiguous(t *testing.T) 
 	// ambiguity-refusal summary must stay silent: the operator is told about
 	// refused keys only when there actually are some, not on every clean run.
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: "movie"}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}},
 		items: map[string][]LibItem{
 			"1": {
-				{RatingKey: 1, Title: "Heat", Year: 1995, GUIDs: []string{"imdb://tt0001"}},
-				{RatingKey: 2, Title: "Speed", Year: 1994, GUIDs: []string{"imdb://tt0002"}},
+				{RatingKey: 1, Title: runesafe.NewUntrusted("Heat"), Year: 1995, GUIDs: []string{"imdb://tt0001"}},
+				{RatingKey: 2, Title: runesafe.NewUntrusted("Speed"), Year: 1994, GUIDs: []string{"imdb://tt0002"}},
 			},
 		},
 	}
@@ -747,9 +748,9 @@ func TestIndexKeysSeparatorCannotForgeAnotherSlot(t *testing.T) {
 func TestIndexKeysBuilderAndLookupAgree(t *testing.T) {
 	t.Parallel()
 	fetcher := &collidingFetcher{
-		sections: []Section{{Key: "1", Title: "Movies", Type: string(Movie)}},
+		sections: []Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: string(Movie)}},
 		items: map[string][]LibItem{
-			"1": {{RatingKey: 42, Title: "Dune | Extended Edition", Year: 2021}},
+			"1": {{RatingKey: 42, Title: runesafe.NewUntrusted("Dune | Extended Edition"), Year: 2021}},
 		},
 	}
 	idx, failed := BuildPlexIndex(t.Context(), fetcher, 1)
