@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -60,7 +60,7 @@ func (c *Client) LibrarySections(ctx context.Context) ([]remap.Section, error) {
 	}
 	out := make([]remap.Section, 0, len(sections))
 	for _, s := range sections {
-		out = append(out, remap.Section{Key: s.Key, Title: runesafe.Untrusted(s.Title), Type: s.Type})
+		out = append(out, remap.Section{Key: s.Key, Title: runesafe.NewUntrusted(s.Title), Type: s.Type})
 	}
 	return out, nil
 }
@@ -96,7 +96,7 @@ func (c *Client) LibraryAll(ctx context.Context, sectionKey string) ([]remap.Lib
 			}
 		}
 		out = append(out, remap.LibItem{
-			RatingKey: rk, Title: runesafe.Untrusted(m.Title), Year: m.Year, GUIDs: guids,
+			RatingKey: rk, Title: runesafe.NewUntrusted(m.Title), Year: m.Year, GUIDs: guids,
 		})
 	}
 	return out, nil

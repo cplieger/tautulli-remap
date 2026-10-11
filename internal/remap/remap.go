@@ -203,7 +203,7 @@ func upsertShow(items map[string]TautulliEntry, key string, row *HistoryItem, ye
 	entry, exists := items[key]
 	if !exists {
 		title := row.GrandparentTitle
-		if title == "" {
+		if title.Raw() == "" {
 			title = row.Title
 		}
 		entry = TautulliEntry{Title: title, Year: year, MediaType: Show, GUID: showGUID}
