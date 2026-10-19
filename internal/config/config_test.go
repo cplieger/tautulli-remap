@@ -3,13 +3,13 @@ package config
 import (
 	"bytes"
 	"errors"
-	"log"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/cplieger/envx/v2"
+	"github.com/cplieger/slogx/capture"
 )
 
 func TestLoad(t *testing.T) {
@@ -135,21 +135,10 @@ func TestLoadInvalidRemapInterval(t *testing.T) {
 // captureLogs redirects the default slog logger into a buffer for the test and
 // returns a closure yielding its contents. parseRemapInterval warns through the
 // package default logger, so this lets a test assert on those side-effects.
-//
-// slog.SetDefault also points the log package at the installed handler and
-// zeroes its flags, and skips that redirect for slog's own default handler, so
-// restoring slog alone leaves log writing into a dead buffer. slog goes back
-// first: reinstalling a non-default prev re-runs the redirect.
 func captureLogs(t *testing.T) func() string {
 	t.Helper()
 	var buf bytes.Buffer
-	prev, prevWriter, prevFlags := slog.Default(), log.Writer(), log.Flags()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() {
-		slog.SetDefault(prev)
-		log.SetOutput(prevWriter)
-		log.SetFlags(prevFlags)
-	})
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	return buf.String
 }
 

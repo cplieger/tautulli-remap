@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/plex"
 	"github.com/cplieger/tautulli-remap/internal/remap"
@@ -537,21 +537,10 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 // captureLogs installs a text handler at the default Info level over a buffer as the default logger for the
 // test and returns that buffer. Tests using it must NOT be parallel (the
 // default logger is process-global).
-//
-// slog.SetDefault also points the log package at the installed handler and
-// zeroes its flags, and skips that redirect for slog's own default handler, so
-// restoring slog alone leaves log writing into a dead buffer. slog goes back
-// first: reinstalling a non-default prev re-runs the redirect.
 func captureLogs(t *testing.T) *strings.Builder {
 	t.Helper()
 	var buf strings.Builder
-	prev, prevWriter, prevFlags := slog.Default(), log.Writer(), log.Flags()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() {
-		slog.SetDefault(prev)
-		log.SetOutput(prevWriter)
-		log.SetFlags(prevFlags)
-	})
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, nil)))
 	return &buf
 }
 
