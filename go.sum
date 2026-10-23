@@ -20,6 +20,8 @@ github.com/cplieger/pathinside/v2 v2.1.0 h1:yBnm859aLMKALi8bTIaYBy7t1osIqCSMIJo8
 github.com/cplieger/pathinside/v2 v2.1.0/go.mod h1:sMHw6mQSFsGWsirWPQyQZ1+kqrAsXf9VcMUTUJsqm0w=
 github.com/cplieger/plexapi/v2 v2.2.0 h1:XRtf9ooAgZ4NaAgejsS8Pban7nOCarkaDKYe9hsn4qg=
 github.com/cplieger/plexapi/v2 v2.2.0/go.mod h1:ZBHY+p26YfWkdGgBegPvJdfaCG75gUj2puv5mekN8gU=
+github.com/cplieger/plexapi/v2 v2.2.1 h1:BfMtaRE8FFIMLEorVRo2lZ31uWqb9eAQVVMpncq6xJM=
+github.com/cplieger/plexapi/v2 v2.2.1/go.mod h1:T9GA6KX4U+/MK4eHf2Ami1d601B36m7AV3clYwW3GzI=
 github.com/cplieger/runesafe/v2 v2.1.1 h1:RE5LVy0ebepMs3Gky6DKgFrV0ykODk2W8OGVa8Zm0H8=
 github.com/cplieger/runesafe/v2 v2.1.1/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
 github.com/cplieger/scheduler/v4 v4.2.3 h1:G6Pe3kgnj42QmMu6V5ogNWY80OlSepybfwuv2hrpPwA=
