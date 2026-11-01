@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/plex"
 	"github.com/cplieger/tautulli-remap/internal/remap"
@@ -29,11 +29,11 @@ type fakePlex struct{}
 
 func (f *fakePlex) ItemExists(_ context.Context, _ string) (bool, error) { return true, nil }
 func (f *fakePlex) LibrarySections(_ context.Context) ([]remap.Section, error) {
-	return []remap.Section{{Key: "1", Title: "Movies", Type: "movie"}}, nil
+	return []remap.Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}}, nil
 }
 
 func (f *fakePlex) LibraryAll(_ context.Context, _ string) ([]remap.LibItem, error) {
-	return []remap.LibItem{{RatingKey: 1, Title: "Test", Year: 2020, GUIDs: []string{"imdb://tt0001"}}}, nil
+	return []remap.LibItem{{RatingKey: 1, Title: runesafe.NewUntrusted("Test"), Year: 2020, GUIDs: []string{"imdb://tt0001"}}}, nil
 }
 
 func (f *fakePlex) ResolveEpisodeShow(_ context.Context, _ string) (string, error) { return "", nil }
@@ -121,7 +121,7 @@ func TestCollectTautulliItems_SinglePage(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
 	}
-	if items["42"].Title != "Movie A" {
+	if items["42"].Title.Raw() != "Movie A" {
 		t.Errorf("unexpected movie title: %s", items["42"].Title)
 	}
 	if items["50"].MediaType != remap.Show {
@@ -332,8 +332,8 @@ func TestFindStaleKeys_IdentifiesStaleAndValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"42":  {Title: "Valid", MediaType: remap.Movie},
-		"999": {Title: "Stale", MediaType: remap.Movie},
+		"42":  {Title: runesafe.NewUntrusted("Valid"), MediaType: remap.Movie},
+		"999": {Title: runesafe.NewUntrusted("Stale"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -353,7 +353,7 @@ func TestFindStaleKeys_AllValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: "A", MediaType: remap.Movie},
+		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -372,7 +372,7 @@ func TestFindStaleKeys_CancelledContext(t *testing.T) {
 	cancel()
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: "A", MediaType: remap.Movie},
+		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	_, _ = orch.findStaleKeys(ctx, items)
 }
@@ -385,7 +385,7 @@ func TestFindStaleKeys_ProgressLogBoundary(t *testing.T) {
 	items := map[string]remap.TautulliEntry{}
 	for i := 1; i <= 250; i++ {
 		k := strconv.Itoa(i)
-		items[k] = remap.TautulliEntry{Title: "M", MediaType: remap.Movie}
+		items[k] = remap.TautulliEntry{Title: runesafe.NewUntrusted("M"), MediaType: remap.Movie}
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -526,7 +526,7 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 	cfg.DryRun = true
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 0 {
@@ -537,21 +537,10 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 // captureLogs installs a text handler at the default Info level over a buffer as the default logger for the
 // test and returns that buffer. Tests using it must NOT be parallel (the
 // default logger is process-global).
-//
-// slog.SetDefault also points the log package at the installed handler and
-// zeroes its flags, and skips that redirect for slog's own default handler, so
-// restoring slog alone leaves log writing into a dead buffer. slog goes back
-// first: reinstalling a non-default prev re-runs the redirect.
 func captureLogs(t *testing.T) *strings.Builder {
 	t.Helper()
 	var buf strings.Builder
-	prev, prevWriter, prevFlags := slog.Default(), log.Writer(), log.Flags()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() {
-		slog.SetDefault(prev)
-		log.SetOutput(prevWriter)
-		log.SetFlags(prevFlags)
-	})
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, nil)))
 	return &buf
 }
 
@@ -560,7 +549,7 @@ func TestApplyRemappings_DryRunPreviewLoggedAtInfo(t *testing.T) {
 
 	o := New(&fakePlex{}, &fakeTautulli{}, &config.Config{DryRun: true})
 	matched := []remap.MatchResult{
-		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	o.applyRemappings(t.Context(), matched, nil)
 
@@ -588,7 +577,7 @@ func TestApplyRemappings_LiveRemap(t *testing.T) {
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 1 {
@@ -603,7 +592,7 @@ func TestApplyRemappings_APIError(t *testing.T) {
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: "Movie A", Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	updated, failed, aborted := orch.applyRemappings(t.Context(), matched, nil)
 	if updated != 0 {
@@ -636,8 +625,8 @@ func TestApplyRemappings_CancelledContext(t *testing.T) {
 	cancel()
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: "A", OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
-		{Title: "B", OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(ctx, matched, nil)
 	if calls > 1 {
@@ -656,7 +645,7 @@ func TestApplyRemappings_AbortsAfterConsecutiveFailures(t *testing.T) {
 	matched := make([]remap.MatchResult, 15)
 	for i := range matched {
 		matched[i] = remap.MatchResult{
-			Title: runesafe.Untrusted(fmt.Sprintf("Movie %d", i)), Year: "2020",
+			Title: runesafe.NewUntrusted(fmt.Sprintf("Movie %d", i)), Year: "2020",
 			OldKey: strconv.Itoa(i), NewKey: strconv.Itoa(100 + i),
 			MediaType: remap.Movie, Method: remap.MethodGUID,
 		}
@@ -1171,7 +1160,7 @@ func TestFindStaleKeys_PlexErrorAborts(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: "A", MediaType: remap.Movie},
+		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err == nil {
@@ -1495,8 +1484,8 @@ func TestApplyRemappings_ShutdownDuringUpdateIsNotAFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	o := New(&fakePlex{}, &shutdownOnUpdateTautulli{cancel: cancel}, &config.Config{DryRun: false})
 	matched := []remap.MatchResult{
-		{Title: "A", OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
-		{Title: "B", OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: runesafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	updated, failed, aborted := o.applyRemappings(ctx, matched, nil)
 	if updated != 0 {

@@ -605,8 +605,9 @@ func (o *Orchestrator) logRemap(m *remap.MatchResult) {
 // breaker tripped (aborted), which fails the run regardless of progress.
 func (o *Orchestrator) applyMatched(ctx context.Context, matched []remap.MatchResult) (updated, failed int, aborted bool) {
 	breaker := newCircuitBreaker(maxConsecutiveFailures)
-	for i, m := range matched {
-		o.logRemap(&m)
+	for i := range matched {
+		m := &matched[i]
+		o.logRemap(m)
 		if o.cfg.DryRun {
 			continue
 		}

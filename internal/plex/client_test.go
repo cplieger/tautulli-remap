@@ -88,7 +88,7 @@ func TestLibrarySections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].Key != "1" || got[1].Type != "show" || got[2].Title != "Music" {
+	if len(got) != 3 || got[0].Key != "1" || got[1].Type != "show" || got[2].Title.Raw() != "Music" {
 		t.Errorf("LibrarySections = %+v", got)
 	}
 }
@@ -124,7 +124,7 @@ func TestLibraryAll(t *testing.T) {
 		t.Fatalf("LibraryAll = %d items, want 2 (invalid key skipped): %+v", len(got), got)
 	}
 	m := got[0]
-	if m.RatingKey != 100 || m.Title != "The Matrix" || m.Year != 1999 {
+	if m.RatingKey != 100 || m.Title.Raw() != "The Matrix" || m.Year != 1999 {
 		t.Errorf("item = %+v", m)
 	}
 	// Legacy-agent GUID normalized + Guid array entries preserved.
