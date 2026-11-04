@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/scheduler/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/scheduler"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 	"github.com/cplieger/tautulli-remap/internal/tautulli"
@@ -389,7 +389,7 @@ func (o *Orchestrator) collectTautulliItems(ctx context.Context) (items map[stri
 			break
 		}
 		slog.Info("progress", "processed", processed, "total", total, "unique_keys", len(items))
-		if err := httpx.SleepCtx(ctx, o.paginationDelay()); err != nil {
+		if err := httpclient.SleepCtx(ctx, o.paginationDelay()); err != nil {
 			return nil, 0
 		}
 	}

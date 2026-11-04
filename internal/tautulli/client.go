@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -75,8 +75,8 @@ func New(tautulliURL, apiKey string, httpClient *http.Client) *Client {
 }
 
 // requestURL builds the Tautulli API v2 URL for cmd with the api key and any
-// extra query params. The api key rides in the query string: httpx redacts it
-// from APIWithRetry's logs and errors, and httpx.RedactSecret strips it from
+// extra query params. The api key rides in the query string: httpclient redacts it
+// from APIWithRetry's logs and errors, and httpclient.RedactSecret strips it from
 // bare-API transport errors. cmd and apikey are applied after extra is
 // merged, so a caller-supplied extra can never override them.
 //
@@ -102,35 +102,35 @@ func (c *Client) call(ctx context.Context, cmd string, extra url.Values) ([]byte
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		c.requestURL(cmd, extra), http.NoBody)
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		httpx.DrainClose(resp.Body)
+		httpclient.DrainClose(resp.Body)
 		return nil, fmt.Errorf("tautulli %s: HTTP %d", cmd, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxTautulliBody))
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	return body, nil
 }
 
 // APIWithRetry performs a GET against the Tautulli API with bounded
 // exponential-backoff retry on 429/5xx (honoring Retry-After) via
-// github.com/cplieger/httpx. 4xx-other-than-429 and non-transient transport
+// github.com/cplieger/go/httpclient. 4xx-other-than-429 and non-transient transport
 // errors are returned immediately. The api key (carried in the query string)
 // is redacted from any returned error. Used for read commands; mutating
 // commands use call directly so they are never retried.
 func (c *Client) APIWithRetry(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
-	body, err := httpx.GetBytes(ctx, c.httpClient, c.requestURL(cmd, extra),
-		httpx.WithMaxAttempts(3),
-		httpx.WithBaseDelay(c.retryDelayUnit()),
-		httpx.WithMaxBodyBytes(maxTautulliBody),
+	body, err := httpclient.GetBytes(ctx, c.httpClient, c.requestURL(cmd, extra),
+		httpclient.WithMaxAttempts(3),
+		httpclient.WithBaseDelay(c.retryDelayUnit()),
+		httpclient.WithMaxBodyBytes(maxTautulliBody),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("tautulli %s: %w", cmd, err)

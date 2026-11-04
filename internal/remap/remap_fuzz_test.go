@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 func FuzzFlexIntUnmarshal(f *testing.F) {
@@ -161,7 +161,7 @@ func FuzzMatchOne(f *testing.F) {
 	f.Fuzz(func(t *testing.T, title, guid, mediaType string) {
 		mt := parseMediaType(mediaType)
 		item := &TautulliEntry{
-			Title:     runesafe.NewUntrusted(title),
+			Title:     textsafe.NewUntrusted(title),
 			Year:      "2020",
 			MediaType: mt,
 			GUID:      guid,

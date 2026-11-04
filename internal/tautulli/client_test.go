@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -241,7 +241,7 @@ func TestAPIWithRetry_Exact3Attempts(t *testing.T) {
 		if calls != 3 {
 			t.Errorf("calls = %d, want 3", calls)
 		}
-		// Bound only: httpx jitters each delay, so the exact figure varies.
+		// Bound only: httpclient jitters each delay, so the exact figure varies.
 		if elapsed >= ClientTimeout {
 			t.Errorf("production retry schedule took %v, which does not fit inside the %v client timeout",
 				elapsed, ClientTimeout)
@@ -350,7 +350,7 @@ func TestRetryDelayUnit(t *testing.T) {
 	}
 }
 
-// TestAPIWithRetry_ErrorDoesNotLeakAPIKey guards the httpx adoption: httpx's
+// TestAPIWithRetry_ErrorDoesNotLeakAPIKey guards the httpclient adoption: httpclient's
 // StatusError embeds the request URL (which carries ?apikey=), so APIWithRetry
 // must redact it from returned errors.
 func TestAPIWithRetry_ErrorDoesNotLeakAPIKey(t *testing.T) {
@@ -369,7 +369,7 @@ func TestAPIWithRetry_ErrorDoesNotLeakAPIKey(t *testing.T) {
 	}
 }
 
-// TestAPIWithRetry_DoesNotLogAPIKey proves the scrubbing logger keeps httpx's
+// TestAPIWithRetry_DoesNotLogAPIKey proves the scrubbing logger keeps httpclient's
 // diagnostic logging (which includes the request URL with ?apikey=) from
 // leaking the key end-to-end.
 func TestAPIWithRetry_DoesNotLogAPIKey(t *testing.T) {
@@ -389,7 +389,7 @@ func TestAPIWithRetry_DoesNotLogAPIKey(t *testing.T) {
 		t.Errorf("retry logging leaked API key:\n%s", logged)
 	}
 	if !strings.Contains(logged, "retries exhausted") {
-		t.Errorf("expected httpx retry diagnostics in log output, got:\n%s", logged)
+		t.Errorf("expected httpclient retry diagnostics in log output, got:\n%s", logged)
 	}
 }
 
