@@ -8,7 +8,7 @@ import (
 )
 
 // The HTTP transport (retry, redirect refusal, status mapping, body caps)
-// is github.com/cplieger/plexapi/v2 and is tested there. These tests pin the
+// is github.com/cplieger/plexapi/v3 and is tested there. These tests pin the
 // adapter: type mapping into remap structs, GUID normalization, and the
 // workflow's fail-closed rules.
 

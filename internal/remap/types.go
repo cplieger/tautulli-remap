@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 // MediaType represents the type of media item.
@@ -98,11 +98,11 @@ func (f *flexInt) UnmarshalJSON(data []byte) error {
 // rating key in the map that holds it.
 //
 // Title (here and on MatchResult / UnmatchResult / HistoryItem / Section /
-// LibItem) carries the runesafe.Untrusted tag since it is media-server text
+// LibItem) carries the textsafe.Untrusted tag since it is media-server text
 // sourced from the wild — sanitized automatically at every slog emit;
 // normalizeTitle reads Raw() for matching.
 type TautulliEntry struct {
-	Title     runesafe.Untrusted
+	Title     textsafe.Untrusted
 	Year      string
 	MediaType MediaType
 	GUID      string
@@ -124,7 +124,7 @@ type PlexEntry struct {
 
 // MatchResult holds the outcome of a successful match.
 type MatchResult struct {
-	Title     runesafe.Untrusted
+	Title     textsafe.Untrusted
 	Year      string
 	OldKey    string
 	NewKey    string
@@ -139,7 +139,7 @@ type MatchResult struct {
 
 // UnmatchResult holds an item that could not be matched.
 type UnmatchResult struct {
-	Title     runesafe.Untrusted
+	Title     textsafe.Untrusted
 	Year      string
 	OldKey    string
 	MediaType MediaType
@@ -149,8 +149,8 @@ type UnmatchResult struct {
 // Title and GrandparentTitle are tagged at this decode boundary (see
 // TautulliEntry).
 type HistoryItem struct {
-	Title            runesafe.Untrusted `json:"title"`
-	GrandparentTitle runesafe.Untrusted `json:"grandparent_title"`
+	Title            textsafe.Untrusted `json:"title"`
+	GrandparentTitle textsafe.Untrusted `json:"grandparent_title"`
 	GUID             string             `json:"guid"`
 	// MediaType is decoded as a plain string rather than MediaType so a row
 	// with an unexpected value (music, clip, live TV) does not fail the whole
@@ -199,13 +199,13 @@ const (
 // Section represents a Plex library section.
 type Section struct {
 	Key   string
-	Title runesafe.Untrusted
+	Title textsafe.Untrusted
 	Type  string
 }
 
 // LibItem represents a Plex library item.
 type LibItem struct {
-	Title     runesafe.Untrusted
+	Title     textsafe.Untrusted
 	GUIDs     []string
 	RatingKey int
 	Year      int

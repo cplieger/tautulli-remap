@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cplieger/health"
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/slogx"
+	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/slogx"
 	appconfig "github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/orchestrator"
 	"github.com/cplieger/tautulli-remap/internal/plex"
@@ -154,7 +154,7 @@ func buildOrchestrator(cfg *appconfig.Config) (*orchestrator.Orchestrator, error
 	}
 	httpClient := &http.Client{
 		Timeout:       tautulli.ClientTimeout,
-		CheckRedirect: httpx.RefuseAllRedirects,
+		CheckRedirect: httpclient.RefuseAllRedirects,
 	}
 	tautulliClient := tautulli.New(cfg.TautulliURL, cfg.TautulliAPIKey, httpClient)
 	return orchestrator.New(plexClient, tautulliClient, cfg), nil

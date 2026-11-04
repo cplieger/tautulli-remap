@@ -34,14 +34,14 @@ services:
 
 The image is `gcr.io/distroless/static-debian13:nonroot` with one static Go binary, built from the `golang` Alpine image. It runs as the base image's `nonroot` user and has no shell or package manager. The binary links these modules:
 
-- [cplieger/health](https://github.com/cplieger/health), the healthcheck file and probe
-- [cplieger/httpx](https://github.com/cplieger/httpx), retrying Tautulli requests and key removal from errors
+- [cplieger/go/health](https://github.com/cplieger/go/tree/main/health), the healthcheck file and probe
+- [cplieger/go/httpclient](https://github.com/cplieger/go/tree/main/httpclient), retrying Tautulli requests and key removal from errors
 - [cplieger/plexapi](https://github.com/cplieger/plexapi), the Plex client
-- [cplieger/scheduler](https://github.com/cplieger/scheduler), the run lock
-- [cplieger/envx](https://github.com/cplieger/envx), reading the settings and secret files
-- [cplieger/slogx](https://github.com/cplieger/slogx), the log setup
-- [cplieger/runesafe](https://github.com/cplieger/runesafe), cleaning Plex titles for the logs
-- [cplieger/keyenc](https://github.com/cplieger/keyenc), the keys of the title lookup tables
+- [cplieger/go/scheduler](https://github.com/cplieger/go/tree/main/scheduler), the run lock
+- [cplieger/go/envx](https://github.com/cplieger/go/tree/main/envx), reading the settings and secret files
+- [cplieger/go/slogx](https://github.com/cplieger/go/tree/main/slogx), the log setup
+- [cplieger/go/textsafe](https://github.com/cplieger/go/tree/main/textsafe), cleaning Plex titles for the logs
+- [cplieger/go/keyenc](https://github.com/cplieger/go/tree/main/keyenc), the keys of the title lookup tables
 - [golang.org/x/sync](https://pkg.go.dev/golang.org/x/sync), running Plex requests in parallel
 
 The tests also use [rapid](https://github.com/flyingmutant/rapid), which is not in the image. The license text of every bundled component is in the image under `/usr/share/licenses/`. [Renovate](https://github.com/renovatebot/renovate) keeps the dependencies up to date, pinned by digest or version.
