@@ -215,11 +215,11 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 	// Success when nothing failed, or when at least one update landed: a
 	// partial remap still made progress and must not flap the health marker.
 	// Deliberately NOT strict-on-failures: per-item failures are usually
-	// transient, and failing 499-of-500 would alert nightly on near-success;
-	// a genuinely poisoned item surfaces once it becomes the pass's only work
-	// (failed>0, updated==0). A tripped circuit breaker (aborted) always
-	// fails the run. A failed recently-added clear also fails it — the next
-	// pass retries while stale entries remain.
+	// transient, and failing 499-of-500 would mark the run failed nightly on
+	// near-success; a genuinely poisoned item surfaces once it becomes the
+	// pass's only work (failed>0, updated==0). A tripped circuit breaker
+	// (aborted) always fails the run. A failed recently-added clear also fails
+	// it, and the next pass retries while stale entries remain.
 	return !aborted && cleared && (failed == 0 || updated > 0)
 }
 
