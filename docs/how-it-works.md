@@ -70,3 +70,5 @@ The image's healthcheck runs `tautulli-remap health` every 30 seconds, which exi
 | `0` | The pass succeeded |
 | `1` | The pass failed or was refused |
 | `3` | A shutdown interrupted the pass before it finished. Run it again |
+
+[Knowing the app is alive](monitoring.md#knowing-the-app-is-alive) says who is told when passes fail or stop, in each run mode.

@@ -95,18 +95,23 @@ tautulli-remap opens no port, and connects out only to the Tautulli and Plex add
 
 ## Troubleshooting
 
-The healthcheck reads a file the app keeps in `/tmp`. With `REMAP_INTERVAL` set to a duration, the container turns unhealthy after 3 failed passes in a row. It also turns unhealthy when no pass has succeeded for 3 intervals. The next good pass makes it healthy again. With `REMAP_INTERVAL=off`, the container stays healthy while it runs, and `tautulli-remap trigger` reports each pass through its exit code.
+With `REMAP_INTERVAL` set to a duration, an unhealthy container means passes keep failing or have stopped. The lines below name the usual causes, and the next good pass makes it healthy again. With `REMAP_INTERVAL=off`, read the exit code of `tautulli-remap trigger` instead.
 
 - The container restarts in a loop with `failed to load configuration`. `TAUTULLI_API_KEY` or `PLEX_TOKEN` did not reach it. Check `.env`, then run `docker compose up -d`.
 - The log says `failed to get history`. The Tautulli address or API key is wrong, or Tautulli is down.
 - The log says `aborting run: Plex returned errors`. The Plex address or token is wrong, or Plex is down. The pass stops before it changes anything.
 - The log says `another remap pass is already running`. A pass started while another one ran, and was refused. Start it again once the first one ends.
 
+## Monitoring
+
+tautulli-remap serves no metrics and ships no alert rules. With `REMAP_INTERVAL` set to a duration, the container turns unhealthy after 3 failed passes in a row, or when no pass succeeds for 3 intervals. With your own scheduler, read the exit code of `tautulli-remap trigger`. The image has a Docker healthcheck. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
+
 ## Documentation
 
 - [How tautulli-remap works](docs/how-it-works.md) explains each pass and match method, for anyone asking why an item did or did not move.
 - [Configuration](docs/configuration.md) covers run modes, external schedulers and secret files.
 - [Security](docs/hardening.md) covers credential handling, a hardened compose setup and what the image contains.
+- [Monitoring](docs/monitoring.md) says what tells you a pass failed, in each run mode.
 
 ## Credits
 
