@@ -7,7 +7,7 @@ tautulli-remap serves no metrics page and ships no alert rules. It hands each pa
 | You run | You get | You set up |
 | --- | --- | --- |
 | Prometheus, Mimir or VictoriaMetrics, with Alertmanager | No metrics and no alert rules from this app | Something that turns Docker health into an alert in timed mode, or an alert on your scheduler's failed jobs |
-| Loki and Alertmanager, no metric store | Every pass's lines in the container log in timed mode, and no alert rules | The same, or your own log rule on the `run failed` line in timed mode |
+| Loki and Alertmanager, no metric store | Every pass's lines in the container log in timed mode, and no alert rules | The same. A log rule on the `run failed` line misses a pass that hangs and a timer that stopped, so watch Docker health instead |
 | Docker or Unraid only | Docker health in timed mode, and the exit code of each `trigger` | Something that watches Docker health, or a scheduler that notifies you on a non-zero exit |
 
 ## Logs

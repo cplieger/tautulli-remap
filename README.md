@@ -104,7 +104,7 @@ With `REMAP_INTERVAL` set to a duration, an unhealthy container means passes kee
 
 ## Monitoring
 
-tautulli-remap serves no metrics and ships no alert rules. With `REMAP_INTERVAL` set to a duration, the container turns unhealthy after 3 failed passes in a row, or when no pass succeeds for 3 intervals. With your own scheduler, read the exit code of `tautulli-remap trigger`. The image has a Docker healthcheck. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
+tautulli-remap serves no metrics and ships no alert rules. With your own scheduler, read the exit code of `tautulli-remap trigger`. The image has a Docker healthcheck. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
 
 ## Documentation
 
