@@ -10,7 +10,7 @@ require (
 	github.com/cplieger/go/scheduler v1.0.0-dev.2
 	github.com/cplieger/go/slogx v1.0.0-dev.2
 	github.com/cplieger/go/textsafe v1.0.0-dev.2
-	github.com/cplieger/plexapi/v3 v3.0.0-dev.7
+	github.com/cplieger/plexapi/v3 v3.0.0-dev.8
 	golang.org/x/sync v0.24.0
 	pgregory.net/rapid v1.3.0
 )
