@@ -2,8 +2,8 @@ github.com/cplieger/go/envx v1.0.0-dev.1 h1:1EAU/2CHQJa1hG1pzkrs2p5ZwwTqhrmHLoj9
 github.com/cplieger/go/envx v1.0.0-dev.1/go.mod h1:VBXyb3Y1VcaOMKyzj+fN2F1ZHRzZgoZuEOafwdg1fkM=
 github.com/cplieger/go/health v1.0.0-dev.3 h1:cTbUZ38yLP8Je8aup6f+WNezkf0rJbtUbHWTLPJfJrQ=
 github.com/cplieger/go/health v1.0.0-dev.3/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
-github.com/cplieger/go/httpclient v1.0.0-dev.5 h1:ZFojfH+6KyRLFCRF77vb0eTrcR9hfCJtKxGoaEOK6+s=
-github.com/cplieger/go/httpclient v1.0.0-dev.5/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
+github.com/cplieger/go/httpclient v1.0.0-dev.6 h1:u1kscbsSswuumIVHte3vvTFGzMDNiLJGpCehP+95Kj8=
+github.com/cplieger/go/httpclient v1.0.0-dev.6/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
 github.com/cplieger/go/keyenc v1.2.0-dev.2 h1:B6j+A7k9EHrAQrNX5KMo14lPsTwo/x7wQdI2AvS+6p8=
 github.com/cplieger/go/keyenc v1.2.0-dev.2/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
 github.com/cplieger/go/pathinside v1.0.0-dev.1 h1:iVkDRXYDDAgaTBm02ekQ+VH7KhXZTIpdpx8O9pGprY8=
@@ -16,8 +16,8 @@ github.com/cplieger/go/textsafe v1.0.0-dev.1 h1:NqiLs9uk4eOoXXkTQo0O8lMtYddo3XZu
 github.com/cplieger/go/textsafe v1.0.0-dev.1/go.mod h1:5IH0ZWTC+U864nzWGtcwGkp+PtA5hrlcfY2zLY/TexM=
 github.com/cplieger/go/xmlx v1.0.0-dev.3 h1:KifH+5OTJR1lCZxddKsv9WBu4neyDXI6fcQnm3VyKe4=
 github.com/cplieger/go/xmlx v1.0.0-dev.3/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.5 h1:0LTM6IfPasVnq93U2dq7zoqGpxUo9e2n2Qx4VvJE1ow=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.5/go.mod h1:L8ZeuUP1oBG7CnHNUmVv1RMe5Ve6m1c5KqLSqZ5esoE=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.6 h1:uPGhOK5fSgAQtvFDid1//ue71eVvxp0j7YYJbYNkC4o=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.6/go.mod h1:Nedz/Vf4q7PZGE3bOc2+Mw0l6E5mss8k97yh33FgK2g=
 golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
 golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 pgregory.net/rapid v1.3.0 h1:vBvO0VSqti75J1jjYqpgPNBLKMd1+gxa9fYo7vk/Exc=
