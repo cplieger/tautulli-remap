@@ -27,32 +27,30 @@ import (
 
 type fakePlex struct{}
 
-func (f *fakePlex) ItemExists(_ context.Context, _ string) (bool, error) { return true, nil }
-func (f *fakePlex) LibrarySections(_ context.Context) ([]remap.Section, error) {
+func (*fakePlex) ItemExists(_ context.Context, _ string) (bool, error) { return true, nil }
+func (*fakePlex) LibrarySections(_ context.Context) ([]remap.Section, error) {
 	return []remap.Section{{Key: "1", Title: textsafe.NewUntrusted("Movies"), Type: "movie"}}, nil
 }
 
-func (f *fakePlex) LibraryAll(_ context.Context, _ string) ([]remap.LibItem, error) {
+func (*fakePlex) LibraryAll(_ context.Context, _ string) ([]remap.LibItem, error) {
 	return []remap.LibItem{{RatingKey: 1, Title: textsafe.NewUntrusted("Test"), Year: 2020, GUIDs: []string{"imdb://tt0001"}}}, nil
 }
 
-func (f *fakePlex) ResolveEpisodeShow(_ context.Context, _ string) (string, error) { return "", nil }
+func (*fakePlex) ResolveEpisodeShow(_ context.Context, _ string) (string, error) { return "", nil }
 
 type fakeTautulli struct{}
 
-func (f *fakeTautulli) APIWithRetry(_ context.Context, _ string, _ url.Values) ([]byte, error) {
-	return []byte(`{"response":{"result":"success","data":{"recordsFiltered":0,"data":[]}}}`), nil
-}
+func (*fakeTautulli) Backup(_ context.Context) error { return nil }
 
-func (f *fakeTautulli) GetHistory(_ context.Context, _ url.Values) (*tautulli.HistoryPage, error) {
+func (*fakeTautulli) GetHistory(_ context.Context, _ url.Values) (*tautulli.HistoryPage, error) {
 	return &tautulli.HistoryPage{Rows: nil, RecordsFiltered: 0}, nil
 }
 
-func (f *fakeTautulli) UpdateMetadata(_ context.Context, _, _ string, _ remap.MediaType) error {
+func (*fakeTautulli) UpdateMetadata(_ context.Context, _, _ string, _ remap.MediaType) error {
 	return nil
 }
 
-func (f *fakeTautulli) DeleteRecentlyAdded(_ context.Context) error {
+func (*fakeTautulli) DeleteRecentlyAdded(_ context.Context) error {
 	return nil
 }
 
@@ -744,7 +742,7 @@ func TestRun_StaleKeysTriggerRemap(t *testing.T) {
 		case cmd == "update_metadata_details":
 			remapCalled = true
 			w.Write([]byte(`{"response":{"result":"success"}}`))
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
 			w.WriteHeader(http.StatusNotFound)
@@ -819,7 +817,7 @@ func TestRun_NonDryRunCallsBackup(t *testing.T) {
 				"recordsFiltered":1,
 				"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
 			}}}`))
-		case cmd == "update_metadata_details" || cmd == "delete_recently_added":
+		case cmd == "backup_db" || cmd == "update_metadata_details" || cmd == "delete_recently_added":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
 			w.WriteHeader(http.StatusNotFound)
@@ -949,50 +947,77 @@ func TestRun_EmptyPlexIndex(t *testing.T) {
 	}
 }
 
+// TestRun_BackupFailureAborts pins two contracts of the live-run backup.
+// backup_db is sent once: Tautulli writes a new backup file for every
+// request it receives, so a repeat after a 503 or a timeout leaves extra
+// full-database backups that are never pruned. And Tautulli's own failure
+// verdict counts: an answer whose result is "error" means no backup was
+// written. Either way the run aborts before any write, because there is no
+// recovery point.
 func TestRun_BackupFailureAborts(t *testing.T) {
-	var mu sync.Mutex
-	callCounts := map[string]int{}
-	cfg := testServer(t, func(w http.ResponseWriter, r *http.Request) {
-		cmd := r.URL.Query().Get("cmd")
-		mu.Lock()
-		callCounts[cmd]++
-		mu.Unlock()
-		switch {
-		case cmd == "backup_db":
-			w.WriteHeader(http.StatusInternalServerError)
-		case cmd == "get_history":
-			w.Write([]byte(`{"response":{"result":"success","data":{
-				"recordsFiltered":1,
-				"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
-			}}}`))
-		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
-			w.WriteHeader(http.StatusNotFound)
-		case strings.HasSuffix(r.URL.Path, "/library/sections"):
-			w.Write([]byte(`{"MediaContainer":{"Directory":[{"key":"1","title":"Movies","type":"movie"}]}}`))
-		case strings.Contains(r.URL.Path, "/sections/1/all"):
-			w.Write([]byte(`{"MediaContainer":{"Metadata":[
-				{"title":"Stale Movie","ratingKey":"200","year":2020,
-				 "guid":"plex://movie/x","Guid":[{"id":"imdb://tt1111111"}]}
-			]}}`))
-		default:
-			w.Write([]byte(`{}`))
-		}
-	})
-	cfg.DryRun = false
-	orch := newOrch(t, cfg)
-	if orch.Run(t.Context()) {
-		t.Error("Run() = true, want false when backup_db fails in live mode (no recovery point, must abort)")
+	cases := []struct {
+		name   string
+		backup func(w http.ResponseWriter, attempt int)
+	}{
+		{"server error then success", func(w http.ResponseWriter, attempt int) {
+			if attempt == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			w.Write([]byte(`{"response":{"result":"success"}}`))
+		}},
+		{"error result", func(w http.ResponseWriter, _ int) {
+			w.Write([]byte(`{"response":{"result":"error","message":"Failed to create backup."}}`))
+		}},
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if callCounts["backup_db"] != 3 {
-		t.Errorf("expected backup_db called 3 times via retry, got %d", callCounts["backup_db"])
-	}
-	if callCounts["update_metadata_details"] != 0 {
-		t.Errorf("expected update_metadata_details NOT called (backup failed, no recovery point), got %d", callCounts["update_metadata_details"])
-	}
-	if callCounts["delete_recently_added"] != 0 {
-		t.Errorf("expected delete_recently_added NOT called after failed backup, got %d", callCounts["delete_recently_added"])
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			callCounts := map[string]int{}
+			cfg := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+				cmd := r.URL.Query().Get("cmd")
+				mu.Lock()
+				callCounts[cmd]++
+				attempt := callCounts[cmd]
+				mu.Unlock()
+				switch {
+				case cmd == "backup_db":
+					tc.backup(w, attempt)
+				case cmd == "get_history":
+					w.Write([]byte(`{"response":{"result":"success","data":{
+						"recordsFiltered":1,
+						"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
+					}}}`))
+				case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
+					w.WriteHeader(http.StatusNotFound)
+				case strings.HasSuffix(r.URL.Path, "/library/sections"):
+					w.Write([]byte(`{"MediaContainer":{"Directory":[{"key":"1","title":"Movies","type":"movie"}]}}`))
+				case strings.Contains(r.URL.Path, "/sections/1/all"):
+					w.Write([]byte(`{"MediaContainer":{"Metadata":[
+						{"title":"Stale Movie","ratingKey":"200","year":2020,
+						 "guid":"plex://movie/x","Guid":[{"id":"imdb://tt1111111"}]}
+					]}}`))
+				default:
+					w.Write([]byte(`{}`))
+				}
+			})
+			cfg.DryRun = false
+			orch := newOrch(t, cfg)
+			if orch.Run(t.Context()) {
+				t.Error("Run() = true, want false when backup_db fails in live mode (no recovery point, must abort)")
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if callCounts["backup_db"] != 1 {
+				t.Errorf("backup_db sent %d times, want 1 (each request writes a new backup file)", callCounts["backup_db"])
+			}
+			if callCounts["update_metadata_details"] != 0 {
+				t.Errorf("expected update_metadata_details NOT called (backup failed, no recovery point), got %d", callCounts["update_metadata_details"])
+			}
+			if callCounts["delete_recently_added"] != 0 {
+				t.Errorf("expected delete_recently_added NOT called after failed backup, got %d", callCounts["delete_recently_added"])
+			}
+		})
 	}
 }
 
@@ -1231,7 +1256,7 @@ func TestRun_BreakerTripAfterSuccessReturnsFalse(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.Contains(r.URL.Path, "/library/metadata/"):
 			w.WriteHeader(http.StatusNotFound) // every item is stale
@@ -1325,7 +1350,7 @@ func TestRun_PartialRemapFailureStillSucceeds(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.Contains(r.URL.Path, "/library/metadata/"):
 			w.WriteHeader(http.StatusNotFound) // both items are stale

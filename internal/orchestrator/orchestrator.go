@@ -75,7 +75,7 @@ type PlexClient interface {
 // TautulliClient defines the interface for Tautulli API interactions, shaped
 // by what the orchestrator needs.
 type TautulliClient interface {
-	APIWithRetry(ctx context.Context, cmd string, params url.Values) ([]byte, error)
+	Backup(ctx context.Context) error
 	GetHistory(ctx context.Context, params url.Values) (*tautulli.HistoryPage, error)
 	UpdateMetadata(ctx context.Context, oldKey, newKey string, mediaType remap.MediaType) error
 	DeleteRecentlyAdded(ctx context.Context) error
@@ -109,11 +109,11 @@ func (o *Orchestrator) createBackup(ctx context.Context) bool {
 		return true
 	}
 	slog.Info("creating Tautulli backup")
-	if _, err := o.tautulli.APIWithRetry(ctx, "backup_db", nil); err != nil {
+	if err := o.tautulli.Backup(ctx); err != nil {
 		if ctx.Err() != nil {
 			slog.Info("backup interrupted by shutdown; aborting run", "cause", context.Cause(ctx))
 		} else {
-			slog.Error("backup failed after retries; aborting run without mutating Tautulli (no recovery point)",
+			slog.Error("backup failed; aborting run without mutating Tautulli (no recovery point)",
 				"error", err)
 		}
 		return false
