@@ -2,10 +2,10 @@ github.com/cplieger/go/envx v1.0.0 h1:L9JL05FV8MkK6Bo4o9fnWCkhRfgKhOoycglAtY34hb
 github.com/cplieger/go/envx v1.0.0/go.mod h1:O0Nxq8Qfg/b1xqduFZYqi7Qm/FczL9fSYpjWq0/nvik=
 github.com/cplieger/go/health v1.0.0 h1:MK3skKEoRhmsrt64O/OSbpbL9Dib0drAeWLQLLhjmPU=
 github.com/cplieger/go/health v1.0.0/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
-github.com/cplieger/go/httpclient v1.1.0-dev.2 h1:UQIynDV7270GoBBlqE72yDyJI8EbdXCQFFkyfeHaN/o=
-github.com/cplieger/go/httpclient v1.1.0-dev.2/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
-github.com/cplieger/go/keyenc v1.2.0 h1:aXG4y6YasM/qkP0dEut/P/POtrRnksdvAqGmh0CNBxo=
-github.com/cplieger/go/keyenc v1.2.0/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
+github.com/cplieger/go/httpclient v1.1.0 h1:WE9EdV4SgCh6bd7kozeYqVJGdQCZEeQk7hrO88mQ+84=
+github.com/cplieger/go/httpclient v1.1.0/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
+github.com/cplieger/go/keyenc v1.2.1 h1:DgSXesNrNAvtdMFxnLjHrKfWhgBkFVStuDsMqSzqRDI=
+github.com/cplieger/go/keyenc v1.2.1/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
 github.com/cplieger/go/pathinside v1.0.0 h1:6AkF/TcxRRaYX11jd3sqwcsPuRBVUcML53bogUQ4YGk=
 github.com/cplieger/go/pathinside v1.0.0/go.mod h1:+Fj6L8z2GUfDFi/uvAzoxF1iIADDf83g4fMbrvelDUY=
 github.com/cplieger/go/scheduler v1.0.0 h1:9hfHmwGHDeV3CenwffaNrOVQ/l9i5XiEz5U4RspoApw=
