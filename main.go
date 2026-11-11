@@ -68,9 +68,8 @@ func main() {
 // file at marker. It returns once ctx ends, with the file removed.
 func runResident(ctx context.Context, cfg *appconfig.Config, orch *orchestrator.Orchestrator, marker string) {
 	st := health.NewStatus(health.WithMarker(marker))
-	// The drain starts at the cancel, so a pass it interrupts cannot report
-	// healthy; AfterFunc's goroutine may still be pending at return, so the
-	// defer is what removes the file before the process exits.
+	// AfterFunc's goroutine may still be pending when the loop returns, so
+	// the defer is what removes the file before the process exits.
 	context.AfterFunc(ctx, st.BeginDrain)
 	defer st.BeginDrain()
 

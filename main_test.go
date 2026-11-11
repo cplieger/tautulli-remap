@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/health/v2"
+
 	appconfig "github.com/cplieger/tautulli-remap/internal/config"
 )
 
@@ -102,16 +104,52 @@ func TestDoTrigger_leaves_the_resident_health_file_alone(t *testing.T) {
 		t.Fatalf("Setup: %v", err)
 	}
 
+	// The swapped markerPath misses a trigger that builds the real path
+	// itself, so plant that file too where this host has /dev/shm.
+	resident := health.MarkerPath("tautulli-remap")
+	planted := plantOldFile(t, resident, old)
+
 	if code := doTrigger(); code != 0 {
 		t.Fatalf("doTrigger() = %d, want 0 for a pass with nothing to fix", code)
 	}
-	info, err := os.Stat(markerPath)
+	checks := []string{markerPath}
+	if planted {
+		checks = append(checks, resident)
+	}
+	for _, path := range checks {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("health file %s after the trigger: %v, want it left in place", path, err)
+			continue
+		}
+		if !info.ModTime().Equal(old) {
+			t.Errorf("health file %s modified at %v, want it untouched at %v", path, info.ModTime(), old)
+		}
+	}
+}
+
+// plantOldFile creates path with mtime old and removes it at cleanup. It
+// reports false, planting nothing, when the folder is missing or the file
+// already exists, so a real resident process's file is never touched.
+func plantOldFile(t *testing.T, path string, old time.Time) bool {
+	t.Helper()
+	if _, err := os.Stat(filepath.Dir(path)); err != nil {
+		t.Logf("skipping %s: %v", path, err)
+		return false
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		t.Fatalf("health file after the trigger: %v, want it left in place", err)
+		t.Logf("skipping %s: %v", path, err)
+		return false
 	}
-	if !info.ModTime().Equal(old) {
-		t.Errorf("health file modified at %v, want it untouched at %v", info.ModTime(), old)
+	t.Cleanup(func() { _ = os.Remove(path) })
+	if err := f.Close(); err != nil {
+		t.Fatalf("Setup: %v", err)
 	}
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	return true
 }
 
 // TestRunResident_keeps_the_health_file_while_it_runs_and_removes_it_at_shutdown
