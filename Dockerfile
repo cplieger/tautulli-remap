@@ -24,12 +24,11 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266
 COPY --chmod=755 --from=builder /tautulli-remap /tautulli-remap
 COPY --from=builder /out/usr/share/licenses /usr/share/licenses
 USER nonroot:nonroot
-# The "health" subcommand probes the /tmp/.healthy marker the main
-# process maintains. In scheduled mode it is created at startup, refreshed after
-# each run, and removed after 3 consecutive failures; in resident-idle mode it
-# reflects process liveness (created at startup, present while the process is
-# alive). Exits 0 if the marker is present, else 1. See docs/how-it-works.md
-# "Health and exit codes".
+# The "health" subcommand reads the /dev/shm/tautulli-remap.healthy file the
+# resident process keeps. In scheduled mode it is written at startup, refreshed
+# after each run, and removed after 3 consecutive failures; in resident-idle
+# mode it is present while the process is alive. A trigger never touches it.
+# See docs/how-it-works.md "Health and exit codes".
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
     CMD ["/tautulli-remap", "health"]
 ENTRYPOINT ["/tautulli-remap"]
