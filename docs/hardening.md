@@ -12,11 +12,11 @@ This page covers how tautulli-remap handles your Tautulli API key and Plex token
 - Every request has a time limit and every answer a size limit. A Tautulli request stops after 2 minutes at most, and a Tautulli answer is read up to 30 MB.
 - Reads from Tautulli and Plex are retried with growing delays, and a server's `Retry-After` is honored. Changes to Tautulli are never retried.
 - Titles from Plex are treated as untrusted text before they reach the logs.
-- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it touches only its health file and run lock in `/tmp`.
+- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it writes only two files: its health file, `/dev/shm/tautulli-remap.healthy`, and its run lock, `/tmp/.remap.lock`.
 
 ## Hardened compose setup
 
-Add these lines to the service in `compose.yaml`. [Hardening a compose file](https://github.com/cplieger/docs/blob/main/docs/hardening.md) explains each setting. The 16 MB `/tmp` holds the health file and the run lock.
+Add these lines to the service in `compose.yaml`. [Hardening a compose file](https://github.com/cplieger/docs/blob/main/docs/hardening.md) explains each setting.
 
 ```yaml
 services:
@@ -30,11 +30,13 @@ services:
       - "/tmp:size=16m"
 ```
 
+With `read_only: true`, the 16 MB `/tmp` tmpfs holds the run lock only, which keeps two passes from running at once. The health file goes to `/dev/shm`, which stays writable under a read-only root, so the health check never depends on the tmpfs.
+
 ## What the image contains
 
 The image is `gcr.io/distroless/static-debian13:nonroot` with one static Go binary, built from the `golang` Alpine image. It runs as the base image's `nonroot` user and has no shell or package manager. The binary links these modules:
 
-- [cplieger/go/health](https://github.com/cplieger/go/tree/main/health), the healthcheck file and probe
+- [cplieger/go/health/v2](https://github.com/cplieger/go/tree/main/health), the health file and its probe
 - [cplieger/go/httpclient](https://github.com/cplieger/go/tree/main/httpclient), retrying Tautulli requests and key removal from errors
 - [cplieger/plexapi](https://github.com/cplieger/plexapi), the Plex client
 - [cplieger/go/scheduler](https://github.com/cplieger/go/tree/main/scheduler), the run lock

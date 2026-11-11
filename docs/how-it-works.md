@@ -58,12 +58,12 @@ Passes take a lock on `/tmp/.remap.lock`, so the built-in timer, a scheduler's t
 
 ## Health and exit codes
 
-The image's healthcheck runs `tautulli-remap health` every 30 seconds, which exits with code 0 when healthy and 1 when not. It passes while the file `/tmp/.healthy` exists, and in timed mode while that file is also fresh.
+The image's healthcheck runs `tautulli-remap health` every 30 seconds, which exits with code 0 when healthy and 1 when not. It passes while the file `/dev/shm/tautulli-remap.healthy` exists, and in timed mode while that file is also fresh. Only the running app writes that file, and it removes the file when it shuts down. If the file cannot be written, the healthcheck passes and the log says so once.
 
 - With `REMAP_INTERVAL` set to a duration, the app marks itself healthy at start. It does so again after each successful pass, including a pass with nothing to fix. After 3 failed passes in a row it marks itself unhealthy. If no pass succeeds for 3 intervals, the file goes stale and the healthcheck fails too. A pass that a shutdown interrupts counts as neither a success nor a failure.
-- With `REMAP_INTERVAL=off`, the app marks itself healthy at start and stays healthy while it runs. A failed trigger does not change that. A successful trigger marks it healthy.
+- With `REMAP_INTERVAL=off`, the app marks itself healthy at start and stays healthy while it runs.
 
-`tautulli-remap trigger` runs one pass and exits with one of these codes:
+`tautulli-remap trigger` runs one pass in a second process and reports by its exit code alone. It never changes the container's health, whatever its result. It exits with one of these codes:
 
 | Code | Meaning |
 | --- | --- |

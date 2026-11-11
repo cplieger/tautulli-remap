@@ -58,7 +58,7 @@ func (cb *circuitBreaker) record(ok bool) bool {
 const defaultPaginationDelay = 500 * time.Millisecond
 
 // schedulerUnhealthyThreshold is the number of consecutive failed scheduled
-// runs RunScheduler tolerates before flipping the health marker unhealthy.
+// runs RunScheduler tolerates before reporting itself unhealthy.
 // Damps transient Plex/Tautulli blips so a single failed run does not flap
 // the container.
 const schedulerUnhealthyThreshold = 3
@@ -213,7 +213,7 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 	logScanComplete(len(tautulliItems), len(stale), len(matched), len(unmatched), updated, failed, o.cfg.DryRun)
 
 	// Success when nothing failed, or when at least one update landed: a
-	// partial remap still made progress and must not flap the health marker.
+	// partial remap still made progress and must not flap the health verdict.
 	// Deliberately NOT strict-on-failures: per-item failures are usually
 	// transient, and failing 499-of-500 would mark the run failed nightly on
 	// near-success; a genuinely poisoned item surfaces once it becomes the
@@ -303,8 +303,8 @@ func (o *Orchestrator) buildIndex(ctx context.Context) (remap.Index, bool) {
 	return idx, true
 }
 
-// RunScheduler implements the long-running scheduled mode. The setHealthy
-// callback controls the health marker.
+// RunScheduler implements the long-running scheduled mode. It reports its
+// health verdict through setHealthy.
 func (o *Orchestrator) RunScheduler(ctx context.Context, setHealthy func(bool)) {
 	interval := o.cfg.RemapInterval
 	slog.Info("scheduled mode", "interval", interval)
@@ -318,8 +318,7 @@ func (o *Orchestrator) RunScheduler(ctx context.Context, setHealthy func(bool)) 
 		ok := o.Run(ctx)
 		if ctx.Err() != nil {
 			// Shutdown interrupted the run; don't count it toward the
-			// damping threshold or flip the marker (deferred Cleanup removes
-			// it on exit).
+			// damping threshold or change the verdict (the caller drains it).
 			return
 		}
 		if ok {

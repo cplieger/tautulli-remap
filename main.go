@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/slogx"
 	appconfig "github.com/cplieger/tautulli-remap/internal/config"
@@ -26,6 +26,8 @@ var (
 	_ orchestrator.TautulliClient = (*tautulli.Client)(nil)
 )
 
+var markerPath = health.MarkerPath("tautulli-remap")
+
 func main() {
 	slogx.Setup(slogx.Options{Level: slog.LevelInfo})
 
@@ -35,7 +37,7 @@ func main() {
 			// Resident-idle yields Interval 0, which disables the lease: idle is
 			// healthy there, and a restart cannot fix a trigger that stopped firing.
 			lease := health.Lease{Interval: appconfig.RemapInterval(), Cycles: 3}
-			health.RunProbe(health.DefaultPath, health.WithMaxAge(lease.Duration()))
+			health.RunProbe(markerPath, health.WithMaxAge(lease.Duration()))
 		case "trigger":
 			runTrigger()
 		default:
@@ -59,19 +61,26 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	runResident(ctx, cfg, orch, markerPath)
+}
 
-	marker := health.NewMarker(health.DefaultPath)
-	marker.Set(false)
-	defer marker.Cleanup()
+// runResident is the long-running process, the only writer of the health
+// file at marker. It returns once ctx ends, with the file removed.
+func runResident(ctx context.Context, cfg *appconfig.Config, orch *orchestrator.Orchestrator, marker string) {
+	st := health.NewStatus(health.WithMarker(marker))
+	// AfterFunc's goroutine may still be pending when the loop returns, so
+	// the defer is what removes the file before the process exits.
+	context.AfterFunc(ctx, st.BeginDrain)
+	defer st.BeginDrain()
 
 	if cfg.RemapInterval > 0 {
-		orch.RunScheduler(ctx, marker.Set)
+		orch.RunScheduler(ctx, st.Set)
 		return
 	}
 
 	// Resident-idle mode: no internal timer, wait for external triggers via
 	// "docker exec ... tautulli-remap trigger". Healthy while idle.
-	marker.Set(true)
+	st.Set(true)
 	slog.Info("resident-idle mode", "reason", "REMAP_INTERVAL=off, awaiting external trigger")
 	<-ctx.Done()
 	slog.Info("shutting down", "mode", "resident-idle", "cause", context.Cause(ctx))
@@ -96,11 +105,8 @@ func doTrigger() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// No marker.Cleanup() here: in resident-idle mode the main process owns
-	// /tmp/.healthy, and this trigger runs as a separate `docker exec` against
-	// the same file — deleting it would mark the resident container unhealthy.
-	marker := health.NewMarker(health.DefaultPath)
-
+	// No health.Status here: this runs as a second process beside the
+	// resident one, and NewStatus with the marker would remove its file.
 	orch, err := buildOrchestrator(cfg)
 	if err != nil {
 		slog.Error("failed to build Plex client", "error", err)
@@ -108,7 +114,7 @@ func doTrigger() int {
 	}
 
 	ok := orch.Run(ctx)
-	return finishTrigger(ctx, ok, marker.Set)
+	return finishTrigger(ctx, ok)
 }
 
 // exitInterrupted is the exit code for a pass interrupted by shutdown before
@@ -117,24 +123,18 @@ func doTrigger() int {
 // unknown-subcommand usage error.
 const exitInterrupted = 3
 
-// finishTrigger records a completed trigger run's outcome and returns the
-// process exit code. It checks ctx.Err() first — a signal arriving mid-run
-// can otherwise make Run's bool return either value depending on timing, so
-// checking the context first makes the exit code deterministic and reports
-// exitInterrupted (RunScheduler.doRun treats this the same way: neither
-// success nor a counted failure). Only when the context is still live does
-// Run's bool decide: success marks the resident process healthy; failure
-// leaves the marker untouched (this trigger runs as a separate `docker exec`
-// against the resident process's marker) and signals failure via exit code 1.
-func finishTrigger(ctx context.Context, ok bool, setHealthy func(bool)) int {
+// finishTrigger returns a trigger run's exit code. It checks ctx.Err() first:
+// a signal arriving mid-run can make Run's bool either value depending on
+// timing, so an interrupted pass always reports exitInterrupted (as
+// RunScheduler's doRun counts it neither a success nor a failure). Only with a
+// live context does Run's bool pick 0 or 1.
+func finishTrigger(ctx context.Context, ok bool) int {
 	if ctx.Err() != nil {
 		slog.Info("trigger interrupted by shutdown; pass incomplete", "cause", context.Cause(ctx))
 		return exitInterrupted
 	}
-	if ok {
-		setHealthy(true)
-	} else {
-		slog.Warn("trigger run failed; health marker left unchanged, failure signalled via exit code")
+	if !ok {
+		slog.Warn("trigger run failed; failure signalled via exit code")
 	}
 	slog.Info("shutting down", "mode", "trigger", "success", ok)
 	if !ok {
