@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cplieger/go/health/v2"
-
 	appconfig "github.com/cplieger/tautulli-remap/internal/config"
 )
 
