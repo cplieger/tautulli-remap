@@ -3,7 +3,7 @@ module github.com/cplieger/tautulli-remap
 go 1.27.4
 
 require (
-	github.com/cplieger/go/envx v1.1.0-dev.3
+	github.com/cplieger/go/envx v1.1.0
 	github.com/cplieger/go/health v1.1.0
 	github.com/cplieger/go/httpclient v1.2.0
 	github.com/cplieger/go/keyenc v1.3.0
