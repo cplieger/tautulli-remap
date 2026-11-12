@@ -1,21 +1,21 @@
 module github.com/cplieger/tautulli-remap
 
-go 1.27.3
+go 1.27.4
 
 require (
-	github.com/cplieger/envx/v2 v2.1.0
-	github.com/cplieger/health v1.10.0
-	github.com/cplieger/httpx/v5 v5.3.0
-	github.com/cplieger/keyenc v1.1.0
-	github.com/cplieger/plexapi/v2 v2.3.1
-	github.com/cplieger/runesafe/v3 v3.2.0
-	github.com/cplieger/scheduler/v4 v4.3.0
-	github.com/cplieger/slogx v1.8.0
-	golang.org/x/sync v0.24.0
+	github.com/cplieger/go/envx v1.1.0
+	github.com/cplieger/go/health/v2 v2.0.0
+	github.com/cplieger/go/httpclient v1.2.0
+	github.com/cplieger/go/keyenc v1.3.0
+	github.com/cplieger/go/scheduler v1.1.0
+	github.com/cplieger/go/slogx v1.1.0
+	github.com/cplieger/go/textsafe v1.1.0
+	github.com/cplieger/plexapi/v3 v3.0.0
+	golang.org/x/sync v0.25.0
 	pgregory.net/rapid v1.3.0
 )
 
 require (
-	github.com/cplieger/pathinside/v2 v2.1.0 // indirect
-	github.com/cplieger/xmlx v1.1.0 // indirect
+	github.com/cplieger/go/pathinside v1.1.0 // indirect
+	github.com/cplieger/go/xmlx v1.1.0 // indirect
 )

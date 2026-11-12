@@ -1,4 +1,4 @@
-// Package plex adapts the shared github.com/cplieger/plexapi/v2 client to the
+// Package plex adapts the shared github.com/cplieger/plexapi/v3 client to the
 // remap workflow's types. The HTTP transport — token-in-header-only,
 // redirect refusal, same-origin path guard, transparent retry of transient
 // failures, bounded reads — is the library's; this package owns only the
@@ -12,8 +12,8 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
+	"github.com/cplieger/plexapi/v3"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -60,7 +60,7 @@ func (c *Client) LibrarySections(ctx context.Context) ([]remap.Section, error) {
 	}
 	out := make([]remap.Section, 0, len(sections))
 	for _, s := range sections {
-		out = append(out, remap.Section{Key: s.Key, Title: runesafe.NewUntrusted(s.Title), Type: s.Type})
+		out = append(out, remap.Section{Key: s.Key, Title: textsafe.NewUntrusted(s.Title), Type: s.Type})
 	}
 	return out, nil
 }
@@ -83,7 +83,7 @@ func (c *Client) LibraryAll(ctx context.Context, sectionKey string) ([]remap.Lib
 		m := &items[i]
 		rk, err := strconv.Atoi(m.RatingKey)
 		if err != nil {
-			slog.Warn("invalid rating key", "key", m.RatingKey, "title", runesafe.Sanitize(m.Title))
+			slog.Warn("invalid rating key", "key", m.RatingKey, "title", textsafe.Sanitize(m.Title))
 			continue
 		}
 		var guids []string
@@ -96,7 +96,7 @@ func (c *Client) LibraryAll(ctx context.Context, sectionKey string) ([]remap.Lib
 			}
 		}
 		out = append(out, remap.LibItem{
-			RatingKey: rk, Title: runesafe.NewUntrusted(m.Title), Year: m.Year, GUIDs: guids,
+			RatingKey: rk, Title: textsafe.NewUntrusted(m.Title), Year: m.Year, GUIDs: guids,
 		})
 	}
 	return out, nil

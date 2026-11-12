@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/runesafe/v3"
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/plex"
 	"github.com/cplieger/tautulli-remap/internal/remap"
@@ -27,32 +27,30 @@ import (
 
 type fakePlex struct{}
 
-func (f *fakePlex) ItemExists(_ context.Context, _ string) (bool, error) { return true, nil }
-func (f *fakePlex) LibrarySections(_ context.Context) ([]remap.Section, error) {
-	return []remap.Section{{Key: "1", Title: runesafe.NewUntrusted("Movies"), Type: "movie"}}, nil
+func (*fakePlex) ItemExists(_ context.Context, _ string) (bool, error) { return true, nil }
+func (*fakePlex) LibrarySections(_ context.Context) ([]remap.Section, error) {
+	return []remap.Section{{Key: "1", Title: textsafe.NewUntrusted("Movies"), Type: "movie"}}, nil
 }
 
-func (f *fakePlex) LibraryAll(_ context.Context, _ string) ([]remap.LibItem, error) {
-	return []remap.LibItem{{RatingKey: 1, Title: runesafe.NewUntrusted("Test"), Year: 2020, GUIDs: []string{"imdb://tt0001"}}}, nil
+func (*fakePlex) LibraryAll(_ context.Context, _ string) ([]remap.LibItem, error) {
+	return []remap.LibItem{{RatingKey: 1, Title: textsafe.NewUntrusted("Test"), Year: 2020, GUIDs: []string{"imdb://tt0001"}}}, nil
 }
 
-func (f *fakePlex) ResolveEpisodeShow(_ context.Context, _ string) (string, error) { return "", nil }
+func (*fakePlex) ResolveEpisodeShow(_ context.Context, _ string) (string, error) { return "", nil }
 
 type fakeTautulli struct{}
 
-func (f *fakeTautulli) APIWithRetry(_ context.Context, _ string, _ url.Values) ([]byte, error) {
-	return []byte(`{"response":{"result":"success","data":{"recordsFiltered":0,"data":[]}}}`), nil
-}
+func (*fakeTautulli) Backup(_ context.Context) error { return nil }
 
-func (f *fakeTautulli) GetHistory(_ context.Context, _ url.Values) (*tautulli.HistoryPage, error) {
+func (*fakeTautulli) GetHistory(_ context.Context, _ url.Values) (*tautulli.HistoryPage, error) {
 	return &tautulli.HistoryPage{Rows: nil, RecordsFiltered: 0}, nil
 }
 
-func (f *fakeTautulli) UpdateMetadata(_ context.Context, _, _ string, _ remap.MediaType) error {
+func (*fakeTautulli) UpdateMetadata(_ context.Context, _, _ string, _ remap.MediaType) error {
 	return nil
 }
 
-func (f *fakeTautulli) DeleteRecentlyAdded(_ context.Context) error {
+func (*fakeTautulli) DeleteRecentlyAdded(_ context.Context) error {
 	return nil
 }
 
@@ -332,8 +330,8 @@ func TestFindStaleKeys_IdentifiesStaleAndValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"42":  {Title: runesafe.NewUntrusted("Valid"), MediaType: remap.Movie},
-		"999": {Title: runesafe.NewUntrusted("Stale"), MediaType: remap.Movie},
+		"42":  {Title: textsafe.NewUntrusted("Valid"), MediaType: remap.Movie},
+		"999": {Title: textsafe.NewUntrusted("Stale"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -353,7 +351,7 @@ func TestFindStaleKeys_AllValid(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
+		"1": {Title: textsafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -372,7 +370,7 @@ func TestFindStaleKeys_CancelledContext(t *testing.T) {
 	cancel()
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
+		"1": {Title: textsafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	_, _ = orch.findStaleKeys(ctx, items)
 }
@@ -385,7 +383,7 @@ func TestFindStaleKeys_ProgressLogBoundary(t *testing.T) {
 	items := map[string]remap.TautulliEntry{}
 	for i := 1; i <= 250; i++ {
 		k := strconv.Itoa(i)
-		items[k] = remap.TautulliEntry{Title: runesafe.NewUntrusted("M"), MediaType: remap.Movie}
+		items[k] = remap.TautulliEntry{Title: textsafe.NewUntrusted("M"), MediaType: remap.Movie}
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err != nil {
@@ -526,7 +524,7 @@ func TestApplyRemappings_DryRun(t *testing.T) {
 	cfg.DryRun = true
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 0 {
@@ -549,7 +547,7 @@ func TestApplyRemappings_DryRunPreviewLoggedAtInfo(t *testing.T) {
 
 	o := New(&fakePlex{}, &fakeTautulli{}, &config.Config{DryRun: true})
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	o.applyRemappings(t.Context(), matched, nil)
 
@@ -577,7 +575,7 @@ func TestApplyRemappings_LiveRemap(t *testing.T) {
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(t.Context(), matched, nil)
 	if calls != 1 {
@@ -592,7 +590,7 @@ func TestApplyRemappings_APIError(t *testing.T) {
 	cfg.DryRun = false
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("Movie A"), Year: "2020", OldKey: "100", NewKey: "200", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	updated, failed, aborted := orch.applyRemappings(t.Context(), matched, nil)
 	if updated != 0 {
@@ -625,8 +623,8 @@ func TestApplyRemappings_CancelledContext(t *testing.T) {
 	cancel()
 	orch := newOrch(t, cfg)
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
-		{Title: runesafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	orch.applyRemappings(ctx, matched, nil)
 	if calls > 1 {
@@ -645,7 +643,7 @@ func TestApplyRemappings_AbortsAfterConsecutiveFailures(t *testing.T) {
 	matched := make([]remap.MatchResult, 15)
 	for i := range matched {
 		matched[i] = remap.MatchResult{
-			Title: runesafe.NewUntrusted(fmt.Sprintf("Movie %d", i)), Year: "2020",
+			Title: textsafe.NewUntrusted(fmt.Sprintf("Movie %d", i)), Year: "2020",
 			OldKey: strconv.Itoa(i), NewKey: strconv.Itoa(100 + i),
 			MediaType: remap.Movie, Method: remap.MethodGUID,
 		}
@@ -744,7 +742,7 @@ func TestRun_StaleKeysTriggerRemap(t *testing.T) {
 		case cmd == "update_metadata_details":
 			remapCalled = true
 			w.Write([]byte(`{"response":{"result":"success"}}`))
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
 			w.WriteHeader(http.StatusNotFound)
@@ -819,7 +817,7 @@ func TestRun_NonDryRunCallsBackup(t *testing.T) {
 				"recordsFiltered":1,
 				"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
 			}}}`))
-		case cmd == "update_metadata_details" || cmd == "delete_recently_added":
+		case cmd == "backup_db" || cmd == "update_metadata_details" || cmd == "delete_recently_added":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
 			w.WriteHeader(http.StatusNotFound)
@@ -949,50 +947,77 @@ func TestRun_EmptyPlexIndex(t *testing.T) {
 	}
 }
 
+// TestRun_BackupFailureAborts pins two contracts of the live-run backup.
+// backup_db is sent once: Tautulli writes a new backup file for every
+// request it receives, so a repeat after a 503 or a timeout leaves extra
+// full-database backups that are never pruned. And Tautulli's own failure
+// verdict counts: an answer whose result is "error" means no backup was
+// written. Either way the run aborts before any write, because there is no
+// recovery point.
 func TestRun_BackupFailureAborts(t *testing.T) {
-	var mu sync.Mutex
-	callCounts := map[string]int{}
-	cfg := testServer(t, func(w http.ResponseWriter, r *http.Request) {
-		cmd := r.URL.Query().Get("cmd")
-		mu.Lock()
-		callCounts[cmd]++
-		mu.Unlock()
-		switch {
-		case cmd == "backup_db":
-			w.WriteHeader(http.StatusInternalServerError)
-		case cmd == "get_history":
-			w.Write([]byte(`{"response":{"result":"success","data":{
-				"recordsFiltered":1,
-				"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
-			}}}`))
-		case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
-			w.WriteHeader(http.StatusNotFound)
-		case strings.HasSuffix(r.URL.Path, "/library/sections"):
-			w.Write([]byte(`{"MediaContainer":{"Directory":[{"key":"1","title":"Movies","type":"movie"}]}}`))
-		case strings.Contains(r.URL.Path, "/sections/1/all"):
-			w.Write([]byte(`{"MediaContainer":{"Metadata":[
-				{"title":"Stale Movie","ratingKey":"200","year":2020,
-				 "guid":"plex://movie/x","Guid":[{"id":"imdb://tt1111111"}]}
-			]}}`))
-		default:
-			w.Write([]byte(`{}`))
-		}
-	})
-	cfg.DryRun = false
-	orch := newOrch(t, cfg)
-	if orch.Run(t.Context()) {
-		t.Error("Run() = true, want false when backup_db fails in live mode (no recovery point, must abort)")
+	cases := []struct {
+		name   string
+		backup func(w http.ResponseWriter, attempt int)
+	}{
+		{"server error then success", func(w http.ResponseWriter, attempt int) {
+			if attempt == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			w.Write([]byte(`{"response":{"result":"success"}}`))
+		}},
+		{"error result", func(w http.ResponseWriter, _ int) {
+			w.Write([]byte(`{"response":{"result":"error","message":"Failed to create backup."}}`))
+		}},
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if callCounts["backup_db"] != 3 {
-		t.Errorf("expected backup_db called 3 times via retry, got %d", callCounts["backup_db"])
-	}
-	if callCounts["update_metadata_details"] != 0 {
-		t.Errorf("expected update_metadata_details NOT called (backup failed, no recovery point), got %d", callCounts["update_metadata_details"])
-	}
-	if callCounts["delete_recently_added"] != 0 {
-		t.Errorf("expected delete_recently_added NOT called after failed backup, got %d", callCounts["delete_recently_added"])
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			callCounts := map[string]int{}
+			cfg := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+				cmd := r.URL.Query().Get("cmd")
+				mu.Lock()
+				callCounts[cmd]++
+				attempt := callCounts[cmd]
+				mu.Unlock()
+				switch {
+				case cmd == "backup_db":
+					tc.backup(w, attempt)
+				case cmd == "get_history":
+					w.Write([]byte(`{"response":{"result":"success","data":{
+						"recordsFiltered":1,
+						"data":[{"rating_key":100,"title":"Stale Movie","year":2020,"media_type":"movie","guid":"imdb://tt1111111"}]
+					}}}`))
+				case strings.HasSuffix(r.URL.Path, "/library/metadata/100"):
+					w.WriteHeader(http.StatusNotFound)
+				case strings.HasSuffix(r.URL.Path, "/library/sections"):
+					w.Write([]byte(`{"MediaContainer":{"Directory":[{"key":"1","title":"Movies","type":"movie"}]}}`))
+				case strings.Contains(r.URL.Path, "/sections/1/all"):
+					w.Write([]byte(`{"MediaContainer":{"Metadata":[
+						{"title":"Stale Movie","ratingKey":"200","year":2020,
+						 "guid":"plex://movie/x","Guid":[{"id":"imdb://tt1111111"}]}
+					]}}`))
+				default:
+					w.Write([]byte(`{}`))
+				}
+			})
+			cfg.DryRun = false
+			orch := newOrch(t, cfg)
+			if orch.Run(t.Context()) {
+				t.Error("Run() = true, want false when backup_db fails in live mode (no recovery point, must abort)")
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if callCounts["backup_db"] != 1 {
+				t.Errorf("backup_db sent %d times, want 1 (each request writes a new backup file)", callCounts["backup_db"])
+			}
+			if callCounts["update_metadata_details"] != 0 {
+				t.Errorf("expected update_metadata_details NOT called (backup failed, no recovery point), got %d", callCounts["update_metadata_details"])
+			}
+			if callCounts["delete_recently_added"] != 0 {
+				t.Errorf("expected delete_recently_added NOT called after failed backup, got %d", callCounts["delete_recently_added"])
+			}
+		})
 	}
 }
 
@@ -1160,7 +1185,7 @@ func TestFindStaleKeys_PlexErrorAborts(t *testing.T) {
 	})
 	orch := newOrch(t, cfg)
 	items := map[string]remap.TautulliEntry{
-		"1": {Title: runesafe.NewUntrusted("A"), MediaType: remap.Movie},
+		"1": {Title: textsafe.NewUntrusted("A"), MediaType: remap.Movie},
 	}
 	stale, err := orch.findStaleKeys(t.Context(), items)
 	if err == nil {
@@ -1231,7 +1256,7 @@ func TestRun_BreakerTripAfterSuccessReturnsFalse(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.Contains(r.URL.Path, "/library/metadata/"):
 			w.WriteHeader(http.StatusNotFound) // every item is stale
@@ -1325,7 +1350,7 @@ func TestRun_PartialRemapFailureStillSucceeds(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
-		case cmd == "delete_recently_added":
+		case cmd == "delete_recently_added" || cmd == "backup_db":
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		case strings.Contains(r.URL.Path, "/library/metadata/"):
 			w.WriteHeader(http.StatusNotFound) // both items are stale
@@ -1484,8 +1509,8 @@ func TestApplyRemappings_ShutdownDuringUpdateIsNotAFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	o := New(&fakePlex{}, &shutdownOnUpdateTautulli{cancel: cancel}, &config.Config{DryRun: false})
 	matched := []remap.MatchResult{
-		{Title: runesafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
-		{Title: runesafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("A"), OldKey: "1", NewKey: "2", MediaType: remap.Movie, Method: remap.MethodGUID},
+		{Title: textsafe.NewUntrusted("B"), OldKey: "3", NewKey: "4", MediaType: remap.Movie, Method: remap.MethodGUID},
 	}
 	updated, failed, aborted := o.applyRemappings(ctx, matched, nil)
 	if updated != 0 {

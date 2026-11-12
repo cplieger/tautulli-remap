@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -109,7 +109,7 @@ func TestAPI_NonRetryable4xx(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "testkey", srv.Client())
-	_, err := c.APIWithRetry(t.Context(), "backup_db", nil)
+	_, err := c.apiWithRetry(t.Context(), "get_history", nil)
 	if err == nil {
 		t.Fatal("expected error for 403")
 	}
@@ -182,7 +182,7 @@ func TestAPIWithRetry_SucceedsOnFirst(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "k", srv.Client())
-	body, err := c.APIWithRetry(t.Context(), "test", nil)
+	body, err := c.apiWithRetry(t.Context(), "test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestAPIWithRetry_RetriesOnServerError(t *testing.T) {
 			w.Write([]byte(`ok`))
 		})
 
-		body, err := c.APIWithRetry(t.Context(), "test", nil)
+		body, err := c.apiWithRetry(t.Context(), "test", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -221,9 +221,8 @@ func TestAPIWithRetry_RetriesOnServerError(t *testing.T) {
 	})
 }
 
-// TestAPIWithRetry_Exact3Attempts pins the attempt cap and, via the synctest
-// bubble's synthetic time, that an exhausted retry chain at the real 5-second
-// base delay still fits inside ClientTimeout.
+// TestAPIWithRetry_Exact3Attempts pins the attempt cap, at the production
+// backoff paid in the synctest bubble's synthetic time.
 func TestAPIWithRetry_Exact3Attempts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		calls := 0
@@ -232,19 +231,12 @@ func TestAPIWithRetry_Exact3Attempts(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 		})
 
-		start := time.Now()
-		_, err := c.APIWithRetry(t.Context(), "test_cmd", nil)
-		elapsed := time.Since(start)
+		_, err := c.apiWithRetry(t.Context(), "test_cmd", nil)
 		if err == nil {
 			t.Error("expected error from all-failing retries")
 		}
 		if calls != 3 {
 			t.Errorf("calls = %d, want 3", calls)
-		}
-		// Bound only: httpx jitters each delay, so the exact figure varies.
-		if elapsed >= ClientTimeout {
-			t.Errorf("production retry schedule took %v, which does not fit inside the %v client timeout",
-				elapsed, ClientTimeout)
 		}
 	})
 }
@@ -263,7 +255,7 @@ func TestAPIWithRetry_SuccessOnSecondAttempt(t *testing.T) {
 			w.Write([]byte(`{"response":{"result":"success"}}`))
 		})
 
-		body, err := c.APIWithRetry(t.Context(), "test_cmd", nil)
+		body, err := c.apiWithRetry(t.Context(), "test_cmd", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -285,7 +277,7 @@ func TestAPIWithRetry_CancelledContextStopsRetries(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	c := newTestClient(srv.URL, "k", srv.Client())
-	_, err := c.APIWithRetry(ctx, "test", nil)
+	_, err := c.apiWithRetry(ctx, "test", nil)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -350,8 +342,8 @@ func TestRetryDelayUnit(t *testing.T) {
 	}
 }
 
-// TestAPIWithRetry_ErrorDoesNotLeakAPIKey guards the httpx adoption: httpx's
-// StatusError embeds the request URL (which carries ?apikey=), so APIWithRetry
+// TestAPIWithRetry_ErrorDoesNotLeakAPIKey guards the httpclient adoption: httpclient's
+// StatusError embeds the request URL (which carries ?apikey=), so apiWithRetry
 // must redact it from returned errors.
 func TestAPIWithRetry_ErrorDoesNotLeakAPIKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -360,7 +352,7 @@ func TestAPIWithRetry_ErrorDoesNotLeakAPIKey(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL, "supersecretkey123", srv.Client())
-	_, err := c.APIWithRetry(t.Context(), "test", nil)
+	_, err := c.apiWithRetry(t.Context(), "test", nil)
 	if err == nil {
 		t.Fatal("expected error from exhausted retries")
 	}
@@ -369,7 +361,7 @@ func TestAPIWithRetry_ErrorDoesNotLeakAPIKey(t *testing.T) {
 	}
 }
 
-// TestAPIWithRetry_DoesNotLogAPIKey proves the scrubbing logger keeps httpx's
+// TestAPIWithRetry_DoesNotLogAPIKey proves the scrubbing logger keeps httpclient's
 // diagnostic logging (which includes the request URL with ?apikey=) from
 // leaking the key end-to-end.
 func TestAPIWithRetry_DoesNotLogAPIKey(t *testing.T) {
@@ -382,14 +374,14 @@ func TestAPIWithRetry_DoesNotLogAPIKey(t *testing.T) {
 	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	c := newTestClient(srv.URL, "supersecretkey123", srv.Client())
-	_, _ = c.APIWithRetry(t.Context(), "test", nil)
+	_, _ = c.apiWithRetry(t.Context(), "test", nil)
 
 	logged := buf.String()
 	if strings.Contains(logged, "supersecretkey123") {
 		t.Errorf("retry logging leaked API key:\n%s", logged)
 	}
 	if !strings.Contains(logged, "retries exhausted") {
-		t.Errorf("expected httpx retry diagnostics in log output, got:\n%s", logged)
+		t.Errorf("expected httpclient retry diagnostics in log output, got:\n%s", logged)
 	}
 }
 
@@ -430,6 +422,82 @@ func TestUpdateMetadata_NonSuccessReturnsError(t *testing.T) {
 	if !strings.Contains(err.Error(), "boom") {
 		t.Errorf("error = %v, want it to include the API message", err)
 	}
+}
+
+func TestBackup_SendsCmdAndSucceeds(t *testing.T) {
+	var gotCmd string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCmd = r.URL.Query().Get("cmd")
+		w.Write([]byte(`{"response":{"result":"success"}}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL, "k", srv.Client())
+	if err := c.Backup(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if gotCmd != "backup_db" {
+		t.Errorf("cmd = %q, want backup_db", gotCmd)
+	}
+}
+
+// TestBackup_SentOnceOnServerError pins that backup_db is never repeated:
+// Tautulli writes a new backup file for every request it receives, including
+// one it answers with an error after starting the backup.
+func TestBackup_SentOnceOnServerError(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte(`{"response":{"result":"success"}}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL, "supersecretkey123", srv.Client())
+	err := c.Backup(t.Context())
+	if err == nil {
+		t.Fatal("Backup() = nil, want the 503 as an error")
+	}
+	if calls != 1 {
+		t.Errorf("backup_db sent %d times, want 1", calls)
+	}
+	if strings.Contains(err.Error(), "supersecretkey123") {
+		t.Errorf("error leaked API key: %s", err.Error())
+	}
+}
+
+func TestBackup_ErrorResultReturnsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"response":{"result":"error","message":"Failed to create backup."}}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL, "k", srv.Client())
+	err := c.Backup(t.Context())
+	if err == nil {
+		t.Fatal("Backup() = nil, want an error for a result that is not success")
+	}
+	if !strings.Contains(err.Error(), "Failed to create backup.") {
+		t.Errorf("error = %v, want it to include the API message", err)
+	}
+}
+
+// TestBackup_WaitsPastCallTimeout pins that Backup is bounded by the
+// http.Client's timeout, not callTimeout: Tautulli answers backup_db only
+// after it has checked and copied its database.
+func TestBackup_WaitsPastCallTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := newBubbleClient(t, func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(callTimeout + time.Minute)
+			w.Write([]byte(`{"response":{"result":"success"}}`))
+		})
+		if err := c.Backup(t.Context()); err != nil {
+			t.Fatalf("Backup() = %v, want nil for an answer after %v", err, callTimeout+time.Minute)
+		}
+	})
 }
 
 func TestDeleteRecentlyAdded_SendsCmdAndSucceeds(t *testing.T) {

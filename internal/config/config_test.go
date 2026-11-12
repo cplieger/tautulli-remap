@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/envx/v2"
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/slogx/capture"
 )
 
 func TestLoad(t *testing.T) {

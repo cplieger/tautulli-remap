@@ -36,7 +36,7 @@ services:
       ofelia.job-exec.tautulli-remap.command: "/tautulli-remap trigger"
 ```
 
-The container stays healthy between runs, and your scheduler reads each pass's exit code. A pass the scheduler starts while another pass runs is refused and exits with code 1, as [One pass at a time](how-it-works.md#one-pass-at-a-time) describes.
+The container stays healthy whatever a pass's result, and your scheduler reads each pass's exit code. Set it to notify you on a non-zero exit, because nothing else does. A pass the scheduler starts while another pass runs is refused and exits with code 1, as [One pass at a time](how-it-works.md#one-pass-at-a-time) describes.
 
 ## Read the key and token from files
 

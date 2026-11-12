@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/scheduler/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/scheduler"
 	"github.com/cplieger/tautulli-remap/internal/config"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 	"github.com/cplieger/tautulli-remap/internal/tautulli"
@@ -58,7 +58,7 @@ func (cb *circuitBreaker) record(ok bool) bool {
 const defaultPaginationDelay = 500 * time.Millisecond
 
 // schedulerUnhealthyThreshold is the number of consecutive failed scheduled
-// runs RunScheduler tolerates before flipping the health marker unhealthy.
+// runs RunScheduler tolerates before reporting itself unhealthy.
 // Damps transient Plex/Tautulli blips so a single failed run does not flap
 // the container.
 const schedulerUnhealthyThreshold = 3
@@ -75,7 +75,7 @@ type PlexClient interface {
 // TautulliClient defines the interface for Tautulli API interactions, shaped
 // by what the orchestrator needs.
 type TautulliClient interface {
-	APIWithRetry(ctx context.Context, cmd string, params url.Values) ([]byte, error)
+	Backup(ctx context.Context) error
 	GetHistory(ctx context.Context, params url.Values) (*tautulli.HistoryPage, error)
 	UpdateMetadata(ctx context.Context, oldKey, newKey string, mediaType remap.MediaType) error
 	DeleteRecentlyAdded(ctx context.Context) error
@@ -109,11 +109,11 @@ func (o *Orchestrator) createBackup(ctx context.Context) bool {
 		return true
 	}
 	slog.Info("creating Tautulli backup")
-	if _, err := o.tautulli.APIWithRetry(ctx, "backup_db", nil); err != nil {
+	if err := o.tautulli.Backup(ctx); err != nil {
 		if ctx.Err() != nil {
 			slog.Info("backup interrupted by shutdown; aborting run", "cause", context.Cause(ctx))
 		} else {
-			slog.Error("backup failed after retries; aborting run without mutating Tautulli (no recovery point)",
+			slog.Error("backup failed; aborting run without mutating Tautulli (no recovery point)",
 				"error", err)
 		}
 		return false
@@ -213,13 +213,13 @@ func (o *Orchestrator) Run(ctx context.Context) bool {
 	logScanComplete(len(tautulliItems), len(stale), len(matched), len(unmatched), updated, failed, o.cfg.DryRun)
 
 	// Success when nothing failed, or when at least one update landed: a
-	// partial remap still made progress and must not flap the health marker.
+	// partial remap still made progress and must not flap the health verdict.
 	// Deliberately NOT strict-on-failures: per-item failures are usually
-	// transient, and failing 499-of-500 would alert nightly on near-success;
-	// a genuinely poisoned item surfaces once it becomes the pass's only work
-	// (failed>0, updated==0). A tripped circuit breaker (aborted) always
-	// fails the run. A failed recently-added clear also fails it — the next
-	// pass retries while stale entries remain.
+	// transient, and failing 499-of-500 would mark the run failed nightly on
+	// near-success; a genuinely poisoned item surfaces once it becomes the
+	// pass's only work (failed>0, updated==0). A tripped circuit breaker
+	// (aborted) always fails the run. A failed recently-added clear also fails
+	// it, and the next pass retries while stale entries remain.
 	return !aborted && cleared && (failed == 0 || updated > 0)
 }
 
@@ -303,8 +303,8 @@ func (o *Orchestrator) buildIndex(ctx context.Context) (remap.Index, bool) {
 	return idx, true
 }
 
-// RunScheduler implements the long-running scheduled mode. The setHealthy
-// callback controls the health marker.
+// RunScheduler implements the long-running scheduled mode. It reports its
+// health verdict through setHealthy.
 func (o *Orchestrator) RunScheduler(ctx context.Context, setHealthy func(bool)) {
 	interval := o.cfg.RemapInterval
 	slog.Info("scheduled mode", "interval", interval)
@@ -318,8 +318,7 @@ func (o *Orchestrator) RunScheduler(ctx context.Context, setHealthy func(bool)) 
 		ok := o.Run(ctx)
 		if ctx.Err() != nil {
 			// Shutdown interrupted the run; don't count it toward the
-			// damping threshold or flip the marker (deferred Cleanup removes
-			// it on exit).
+			// damping threshold or change the verdict (the caller drains it).
 			return
 		}
 		if ok {
@@ -389,7 +388,7 @@ func (o *Orchestrator) collectTautulliItems(ctx context.Context) (items map[stri
 			break
 		}
 		slog.Info("progress", "processed", processed, "total", total, "unique_keys", len(items))
-		if err := httpx.SleepCtx(ctx, o.paginationDelay()); err != nil {
+		if err := httpclient.SleepCtx(ctx, o.paginationDelay()); err != nil {
 			return nil, 0
 		}
 	}

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/tautulli-remap/internal/remap"
 )
 
@@ -23,11 +23,15 @@ const resultSuccess = "success"
 // defaultRetryDelayUnit is the base delay multiplied by attempt number.
 const defaultRetryDelayUnit = 5 * time.Second
 
-// ClientTimeout is the total budget for one Tautulli HTTP request including
-// retries; main.go installs it on the http.Client it injects. It must
-// accommodate APIWithRetry's whole backoff schedule — a lower client timeout
-// cuts the retry chain short before the attempt cap applies.
+// ClientTimeout bounds each Tautulli HTTP request, the response body
+// included; main.go installs it on the http.Client it injects. Every retry
+// attempt is a new request with the whole bound. It is the only timeout on
+// Backup, so it must cover the slowest command: Tautulli answers backup_db
+// only after it has checked and copied its database.
 const ClientTimeout = 2 * time.Minute
+
+// callTimeout bounds one send-once command other than backup_db.
+const callTimeout = 30 * time.Second
 
 // Client is the concrete Tautulli API client.
 type Client struct {
@@ -75,8 +79,8 @@ func New(tautulliURL, apiKey string, httpClient *http.Client) *Client {
 }
 
 // requestURL builds the Tautulli API v2 URL for cmd with the api key and any
-// extra query params. The api key rides in the query string: httpx redacts it
-// from APIWithRetry's logs and errors, and httpx.RedactSecret strips it from
+// extra query params. The api key rides in the query string: httpclient redacts it
+// from apiWithRetry's logs and errors, and httpclient.RedactSecret strips it from
 // bare-API transport errors. cmd and apikey are applied after extra is
 // merged, so a caller-supplied extra can never override them.
 //
@@ -92,45 +96,51 @@ func (c *Client) requestURL(cmd string, extra url.Values) string {
 	return c.url + "/api/v2?" + params.Encode()
 }
 
-// call executes a single Tautulli API v2 GET command and returns the raw
-// response body. The API key is embedded in the query string and redacted
-// from any transport error. Callers that need retry logic should use
-// APIWithRetry instead.
+// call sends one Tautulli API v2 GET command once, within callTimeout, and
+// returns the raw response body. Tautulli carries its writes as GET commands
+// too, so mutating commands use call or send, never apiWithRetry.
 func (c *Client) call(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
+	return c.send(ctx, cmd, extra)
+}
+
+// send sends one Tautulli API v2 GET command once, bounded only by ctx and
+// the http.Client's timeout, and returns the raw response body. The API key
+// is embedded in the query string and redacted from any transport error.
+func (c *Client) send(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		c.requestURL(cmd, extra), http.NoBody)
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		httpx.DrainClose(resp.Body)
+		httpclient.DrainClose(resp.Body)
 		return nil, fmt.Errorf("tautulli %s: HTTP %d", cmd, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxTautulliBody))
 	if err != nil {
-		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpx.RedactSecret(err, c.apiKey))
+		return nil, fmt.Errorf("tautulli %s: %w", cmd, httpclient.RedactSecret(err, c.apiKey))
 	}
 	return body, nil
 }
 
-// APIWithRetry performs a GET against the Tautulli API with bounded
+// apiWithRetry performs a GET against the Tautulli API with bounded
 // exponential-backoff retry on 429/5xx (honoring Retry-After) via
-// github.com/cplieger/httpx. 4xx-other-than-429 and non-transient transport
+// github.com/cplieger/go/httpclient. 4xx-other-than-429 and non-transient transport
 // errors are returned immediately. The api key (carried in the query string)
-// is redacted from any returned error. Used for read commands; mutating
-// commands use call directly so they are never retried.
-func (c *Client) APIWithRetry(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
-	body, err := httpx.GetBytes(ctx, c.httpClient, c.requestURL(cmd, extra),
-		httpx.WithMaxAttempts(3),
-		httpx.WithBaseDelay(c.retryDelayUnit()),
-		httpx.WithMaxBodyBytes(maxTautulliBody),
+// is redacted from any returned error. Only for read commands: a repeated
+// write is applied twice.
+func (c *Client) apiWithRetry(ctx context.Context, cmd string, extra url.Values) ([]byte, error) {
+	body, err := httpclient.GetBytes(ctx, c.httpClient, c.requestURL(cmd, extra),
+		httpclient.WithMaxAttempts(3),
+		httpclient.WithBaseDelay(c.retryDelayUnit()),
+		httpclient.WithMaxBodyBytes(maxTautulliBody),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("tautulli %s: %w", cmd, err)
@@ -140,9 +150,9 @@ func (c *Client) APIWithRetry(ctx context.Context, cmd string, extra url.Values)
 
 // GetHistory fetches one page of Tautulli watch history using the supplied
 // query parameters (start, length, media_type, etc.) and returns a parsed
-// HistoryPage. It retries on transient errors via APIWithRetry.
+// HistoryPage. It retries on transient errors via apiWithRetry.
 func (c *Client) GetHistory(ctx context.Context, params url.Values) (*HistoryPage, error) {
-	body, err := c.APIWithRetry(ctx, "get_history", params)
+	body, err := c.apiWithRetry(ctx, "get_history", params)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +180,20 @@ func checkResult(body []byte, cmd string) error {
 		return fmt.Errorf("%s: result=%q message=%q", cmd, resp.Response.Result, resp.Response.Message)
 	}
 	return nil
+}
+
+// Backup asks Tautulli to back up its database, sending backup_db once:
+// Tautulli writes a new backup file for every request it receives and never
+// prunes a manual one, so a repeat after a 5xx or a timeout would leave extra
+// full copies. A result other than success means no backup was written.
+// It waits up to the http.Client's timeout, not callTimeout, because Tautulli
+// answers only once the backup is written.
+func (c *Client) Backup(ctx context.Context) error {
+	body, err := c.send(ctx, "backup_db", nil)
+	if err != nil {
+		return err
+	}
+	return checkResult(body, "backup_db")
 }
 
 // UpdateMetadata updates the Tautulli history records for a renamed Plex item,

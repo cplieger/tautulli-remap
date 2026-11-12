@@ -12,11 +12,11 @@ This page covers how tautulli-remap handles your Tautulli API key and Plex token
 - Every request has a time limit and every answer a size limit. A Tautulli request stops after 2 minutes at most, and a Tautulli answer is read up to 30 MB.
 - Reads from Tautulli and Plex are retried with growing delays, and a server's `Retry-After` is honored. Changes to Tautulli are never retried.
 - Titles from Plex are treated as untrusted text before they reach the logs.
-- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it touches only its health file and run lock in `/tmp`.
+- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it writes only two files: its health file, `/dev/shm/tautulli-remap.healthy`, and its run lock, `/tmp/.remap.lock`.
 
 ## Hardened compose setup
 
-Add these lines to the service in `compose.yaml`. [Hardening a compose file](https://github.com/cplieger/docs/blob/main/docs/hardening.md) explains each setting. The 16 MB `/tmp` holds the health file and the run lock.
+Add these lines to the service in `compose.yaml`. [Hardening a compose file](https://github.com/cplieger/docs/blob/main/docs/hardening.md) explains each setting.
 
 ```yaml
 services:
@@ -30,18 +30,20 @@ services:
       - "/tmp:size=16m"
 ```
 
+With `read_only: true`, the 16 MB `/tmp` tmpfs holds the run lock only, which keeps two passes from running at once. The health file goes to `/dev/shm`, which stays writable under a read-only root, so the health check never depends on the tmpfs.
+
 ## What the image contains
 
 The image is `gcr.io/distroless/static-debian13:nonroot` with one static Go binary, built from the `golang` Alpine image. It runs as the base image's `nonroot` user and has no shell or package manager. The binary links these modules:
 
-- [cplieger/health](https://github.com/cplieger/health), the healthcheck file and probe
-- [cplieger/httpx](https://github.com/cplieger/httpx), retrying Tautulli requests and key removal from errors
+- [cplieger/go/health/v2](https://github.com/cplieger/go/tree/main/health), the health file and its probe
+- [cplieger/go/httpclient](https://github.com/cplieger/go/tree/main/httpclient), retrying Tautulli requests and key removal from errors
 - [cplieger/plexapi](https://github.com/cplieger/plexapi), the Plex client
-- [cplieger/scheduler](https://github.com/cplieger/scheduler), the run lock
-- [cplieger/envx](https://github.com/cplieger/envx), reading the settings and secret files
-- [cplieger/slogx](https://github.com/cplieger/slogx), the log setup
-- [cplieger/runesafe](https://github.com/cplieger/runesafe), cleaning Plex titles for the logs
-- [cplieger/keyenc](https://github.com/cplieger/keyenc), the keys of the title lookup tables
+- [cplieger/go/scheduler](https://github.com/cplieger/go/tree/main/scheduler), the run lock
+- [cplieger/go/envx](https://github.com/cplieger/go/tree/main/envx), reading the settings and secret files
+- [cplieger/go/slogx](https://github.com/cplieger/go/tree/main/slogx), the log setup
+- [cplieger/go/textsafe](https://github.com/cplieger/go/tree/main/textsafe), cleaning Plex titles for the logs
+- [cplieger/go/keyenc](https://github.com/cplieger/go/tree/main/keyenc), the keys of the title lookup tables
 - [golang.org/x/sync](https://pkg.go.dev/golang.org/x/sync), running Plex requests in parallel
 
 The tests also use [rapid](https://github.com/flyingmutant/rapid), which is not in the image. The license text of every bundled component is in the image under `/usr/share/licenses/`. [Renovate](https://github.com/renovatebot/renovate) keeps the dependencies up to date, pinned by digest or version.

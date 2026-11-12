@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 func TestNormalizeGUID(t *testing.T) {
@@ -81,7 +81,7 @@ func TestExtractAfter(t *testing.T) {
 
 func TestMatchOne(t *testing.T) {
 	t.Run("guid match", func(t *testing.T) {
-		item := &TautulliEntry{GUID: "imdb://tt1", Title: runesafe.NewUntrusted("M"), Year: "2020", MediaType: Movie}
+		item := &TautulliEntry{GUID: "imdb://tt1", Title: textsafe.NewUntrusted("M"), Year: "2020", MediaType: Movie}
 		byGUID := map[string]PlexEntry{"imdb://tt1": {RatingKey: "200", Type: Movie}}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{ByGUID: byGUID}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "200" || method != MethodGUID {
@@ -95,7 +95,7 @@ func TestMatchOne(t *testing.T) {
 	t.Run("guid cross-type rejected", func(t *testing.T) {
 		// byGUID is keyed by the bare GUID, not by type, so a stale Movie's
 		// tmdb:// ID must not match a Show indexed under the same GUID.
-		item := &TautulliEntry{GUID: "tmdb://12345", Title: runesafe.NewUntrusted("Quiz Show"), Year: "1994", MediaType: Movie}
+		item := &TautulliEntry{GUID: "tmdb://12345", Title: textsafe.NewUntrusted("Quiz Show"), Year: "1994", MediaType: Movie}
 		byGUID := map[string]PlexEntry{"tmdb://12345": {RatingKey: "200", Year: "1994", Type: Show}}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{ByGUID: byGUID}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "" || method != "" || matchedYear != "" {
@@ -104,7 +104,7 @@ func TestMatchOne(t *testing.T) {
 	})
 
 	t.Run("title+year fallback", func(t *testing.T) {
-		item := &TautulliEntry{Title: runesafe.NewUntrusted("Movie"), Year: "2020", MediaType: Movie}
+		item := &TautulliEntry{Title: textsafe.NewUntrusted("Movie"), Year: "2020", MediaType: Movie}
 		byTY := map[string]PlexEntry{titleYearKey("movie", "2020", Movie): {RatingKey: "200", Type: Movie}}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitleYear: byTY}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "200" || method != methodTitleYear {
@@ -116,7 +116,7 @@ func TestMatchOne(t *testing.T) {
 	})
 
 	t.Run("no match", func(t *testing.T) {
-		item := &TautulliEntry{Title: runesafe.NewUntrusted("X"), Year: "2020", MediaType: Movie}
+		item := &TautulliEntry{Title: textsafe.NewUntrusted("X"), Year: "2020", MediaType: Movie}
 		key, method, matchedYear := matchOne(item, "100", nil, Index{}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "" || method != "" || matchedYear != "" {
 			t.Errorf("got (%q, %q, %q), want empty", key, method, matchedYear)
@@ -125,7 +125,7 @@ func TestMatchOne(t *testing.T) {
 
 	t.Run("episode-guid resolution takes priority over GUID index", func(t *testing.T) {
 		// A resolved show key is exact; it wins over a lower-confidence GUID match.
-		item := &TautulliEntry{Title: runesafe.NewUntrusted("Show"), Year: "2021", MediaType: Show, GUID: "tvdb://1"}
+		item := &TautulliEntry{Title: textsafe.NewUntrusted("Show"), Year: "2021", MediaType: Show, GUID: "tvdb://1"}
 		byGUID := map[string]PlexEntry{"tvdb://1": {RatingKey: "999", Type: Show}}
 		resolved := map[string]string{"100": "200"}
 		key, method, matchedYear := matchOne(item, "100", resolved, Index{ByGUID: byGUID}, Fallbacks{TitleYear: true, TitleOnly: true})
@@ -138,7 +138,7 @@ func TestMatchOne(t *testing.T) {
 	})
 
 	t.Run("episode-guid resolution to the same key is not a match", func(t *testing.T) {
-		item := &TautulliEntry{Title: runesafe.NewUntrusted("Show"), Year: "2021", MediaType: Show}
+		item := &TautulliEntry{Title: textsafe.NewUntrusted("Show"), Year: "2021", MediaType: Show}
 		resolved := map[string]string{"100": "100"}
 		key, method, matchedYear := matchOne(item, "100", resolved, Index{}, Fallbacks{TitleYear: true, TitleOnly: true})
 		if key != "" || method != "" || matchedYear != "" {
@@ -151,7 +151,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("movie with valid rating key", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: 42, Title: runesafe.NewUntrusted("Test Movie"),
+			RatingKey: 42, Title: textsafe.NewUntrusted("Test Movie"),
 			Year: 2020, MediaType: "movie",
 			GUID: "imdb://tt1234567",
 		}
@@ -167,7 +167,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("movie with zero rating key is skipped", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: 0, Title: runesafe.NewUntrusted("Bad Movie"),
+			RatingKey: 0, Title: textsafe.NewUntrusted("Bad Movie"),
 			Year: 2020, MediaType: "movie",
 		}
 		ProcessHistoryRow(row, items)
@@ -180,7 +180,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 50,
-			Title: runesafe.NewUntrusted("Episode Title"), GrandparentTitle: runesafe.NewUntrusted("Show Title"),
+			Title: textsafe.NewUntrusted("Episode Title"), GrandparentTitle: textsafe.NewUntrusted("Show Title"),
 			Year: 2021, MediaType: "episode",
 			GUID: "tvdb://271557",
 		}
@@ -201,7 +201,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 0,
-			Title: runesafe.NewUntrusted("Episode"), MediaType: "episode",
+			Title: textsafe.NewUntrusted("Episode"), MediaType: "episode",
 		}
 		ProcessHistoryRow(row, items)
 		if len(items) != 0 {
@@ -213,7 +213,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 50,
-			Title: runesafe.NewUntrusted("Ep"), GrandparentTitle: runesafe.NewUntrusted("Show"),
+			Title: textsafe.NewUntrusted("Ep"), GrandparentTitle: textsafe.NewUntrusted("Show"),
 			Year: 2021, MediaType: "episode",
 			GUID: "plex://episode/5d9c135046115600200d30a2",
 		}
@@ -236,8 +236,8 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		mk := func(guid string) *HistoryItem {
 			return &HistoryItem{
-				RatingKey: 1, GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep"),
-				GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode", GUID: guid,
+				RatingKey: 1, GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep"),
+				GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode", GUID: guid,
 			}
 		}
 		ProcessHistoryRow(mk("plex://episode/aaa"), items)
@@ -253,8 +253,8 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		for i := range maxEpisodeGUIDsPerShow + 3 {
 			row := &HistoryItem{
-				RatingKey: flexInt(i + 1), GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep"),
-				GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
+				RatingKey: flexInt(i + 1), GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep"),
+				GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
 				GUID: fmt.Sprintf("plex://episode/%d", i),
 			}
 			ProcessHistoryRow(row, items)
@@ -267,8 +267,8 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("legacy episode GUID becomes show GUID and is not captured", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: 99, GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep"),
-			GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
+			RatingKey: 99, GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep"),
+			GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
 			GUID: "com.plexapp.agents.thetvdb://121361/6/1?lang=en",
 		}
 		if captured := ProcessHistoryRow(row, items); captured {
@@ -286,13 +286,13 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("later legacy row fills a show GUID left empty by a plex episode row", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		ProcessHistoryRow(&HistoryItem{
-			RatingKey: 1, GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep1"),
-			GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
+			RatingKey: 1, GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep1"),
+			GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
 			GUID: "plex://episode/aaa",
 		}, items)
 		ProcessHistoryRow(&HistoryItem{
-			RatingKey: 2, GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep2"),
-			GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
+			RatingKey: 2, GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep2"),
+			GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode",
 			GUID: "thetvdb://121361/6/2",
 		}, items)
 		entry := items["50"]
@@ -308,7 +308,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 50,
-			Title: runesafe.NewUntrusted("Fallback Title"), GrandparentTitle: runesafe.NewUntrusted(""),
+			Title: textsafe.NewUntrusted("Fallback Title"), GrandparentTitle: textsafe.NewUntrusted(""),
 			Year: 2021, MediaType: "episode",
 		}
 		ProcessHistoryRow(row, items)
@@ -319,10 +319,10 @@ func TestProcessHistoryRow(t *testing.T) {
 
 	t.Run("duplicate key is not overwritten", func(t *testing.T) {
 		items := map[string]TautulliEntry{
-			"42": {Title: runesafe.NewUntrusted("First"), Year: "2020", MediaType: Movie},
+			"42": {Title: textsafe.NewUntrusted("First"), Year: "2020", MediaType: Movie},
 		}
 		row := &HistoryItem{
-			RatingKey: 42, Title: runesafe.NewUntrusted("Second"),
+			RatingKey: 42, Title: textsafe.NewUntrusted("Second"),
 			Year: 2021, MediaType: "movie",
 		}
 		ProcessHistoryRow(row, items)
@@ -334,7 +334,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("unknown media type is ignored", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: 42, Title: runesafe.NewUntrusted("Music"),
+			RatingKey: 42, Title: textsafe.NewUntrusted("Music"),
 			Year: 2020, MediaType: "track",
 		}
 		ProcessHistoryRow(row, items)
@@ -347,7 +347,7 @@ func TestProcessHistoryRow(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 0,
-			Title: runesafe.NewUntrusted("Episode"), GrandparentTitle: runesafe.NewUntrusted("Show"),
+			Title: textsafe.NewUntrusted("Episode"), GrandparentTitle: textsafe.NewUntrusted("Show"),
 			Year: 2021, MediaType: "episode",
 		}
 		ProcessHistoryRow(row, items)
@@ -358,11 +358,11 @@ func TestProcessHistoryRow(t *testing.T) {
 
 	t.Run("episode duplicate grandparent not overwritten", func(t *testing.T) {
 		items := map[string]TautulliEntry{
-			"50": {Title: runesafe.NewUntrusted("First Show"), Year: "2020", MediaType: Show},
+			"50": {Title: textsafe.NewUntrusted("First Show"), Year: "2020", MediaType: Show},
 		}
 		row := &HistoryItem{
 			RatingKey: 99, GrandparentRatingKey: 50,
-			Title: runesafe.NewUntrusted("New Episode"), GrandparentTitle: runesafe.NewUntrusted("Second Show"),
+			Title: textsafe.NewUntrusted("New Episode"), GrandparentTitle: textsafe.NewUntrusted("Second Show"),
 			Year: 2021, MediaType: "episode",
 		}
 		ProcessHistoryRow(row, items)
@@ -374,7 +374,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("movie with flexInt rating key", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: 42, Title: runesafe.NewUntrusted("String Key Movie"),
+			RatingKey: 42, Title: textsafe.NewUntrusted("String Key Movie"),
 			Year: 2020, MediaType: "movie", GUID: "imdb://tt1234567",
 		}
 		ProcessHistoryRow(row, items)
@@ -389,7 +389,7 @@ func TestProcessHistoryRow(t *testing.T) {
 	t.Run("negative rating key is skipped", func(t *testing.T) {
 		items := map[string]TautulliEntry{}
 		row := &HistoryItem{
-			RatingKey: flexInt(-1), Title: runesafe.NewUntrusted("Negative Key"),
+			RatingKey: flexInt(-1), Title: textsafe.NewUntrusted("Negative Key"),
 			Year: 2020, MediaType: "movie",
 		}
 		ProcessHistoryRow(row, items)
@@ -470,7 +470,7 @@ func TestMatchStaleItems(t *testing.T) {
 	}{
 		{
 			name:        "guid match takes priority over title+year",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("The Matrix"), Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("The Matrix"), Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
 			byGUID:      map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Year: "1999", Type: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "300", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
@@ -478,21 +478,21 @@ func TestMatchStaleItems(t *testing.T) {
 		},
 		{
 			name:        "title+year fallback when no guid",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Inception"), Year: "2010", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Inception"), Year: "2010", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Year: "2010", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "200"), wantMethod(0, methodTitleYear)},
 		},
 		{
 			name:     "title-only fallback with matching type",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
 			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Year: "2021", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchMethodPrefix(0, "title only")},
 		},
 		{
 			name:     "title-only rejects type mismatch",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Home Alone"), Year: "2025", MediaType: Show}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Home Alone"), Year: "2025", MediaType: Show}},
 			byTitle:  map[string]PlexEntry{titleKey("home alone", Movie): {RatingKey: "200", Year: "1990", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
@@ -501,34 +501,34 @@ func TestMatchStaleItems(t *testing.T) {
 			// The title+year lookup key folds in media type, so a stale Movie
 			// can only resolve to a Movie slot.
 			name:        "title+year rejects type mismatch",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Heat"), Year: "1995", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Heat"), Year: "1995", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("heat", "1995", Show): {RatingKey: "200", Year: "1995", Type: Show}},
 			enableTY:    true, enableTO: false,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "case insensitive title matching",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("THE MATRIX"), Year: "1999", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("THE MATRIX"), Year: "1999", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "200")},
 		},
 		{
 			name:     "same key is not remapped",
-			stale:    map[string]TautulliEntry{"200": {Title: runesafe.NewUntrusted("The Matrix"), Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
+			stale:    map[string]TautulliEntry{"200": {Title: textsafe.NewUntrusted("The Matrix"), Year: "1999", MediaType: Movie, GUID: "imdb://tt0133093"}},
 			byGUID:   map[string]PlexEntry{"imdb://tt0133093": {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:     "no match produces unmatched",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Nonexistent"), Year: "2025", MediaType: Movie, GUID: "imdb://tt0000000"}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Nonexistent"), Year: "2025", MediaType: Movie, GUID: "imdb://tt0000000"}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1), unmatchedKey(0, "100")},
 		},
 		{
 			name:        "title+year disabled skips fallback",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Inception"), Year: "2010", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Inception"), Year: "2010", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("inception", "2010", Movie): {RatingKey: "200", Year: "2010", Type: Movie}},
 			enableTY:    false, enableTO: false,
 			checks: []check{matchCount(0, 1)},
@@ -536,21 +536,21 @@ func TestMatchStaleItems(t *testing.T) {
 
 		{
 			name:     "title-only disabled skips fallback",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
 			byTitle:  map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "200", Year: "2021", Type: Movie}},
 			enableTY: true, enableTO: false,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "whitespace-only title does not match",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("   "), Year: "2020", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("   "), Year: "2020", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:     "empty GUID skips GUID matching",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Test"), Year: "2020", MediaType: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Test"), Year: "2020", MediaType: Movie}},
 			byGUID:   map[string]PlexEntry{"": {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
@@ -558,9 +558,9 @@ func TestMatchStaleItems(t *testing.T) {
 		{
 			name: "multiple stale items mixed results",
 			stale: map[string]TautulliEntry{
-				"100": {Title: runesafe.NewUntrusted("Movie A"), Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"},
-				"200": {Title: runesafe.NewUntrusted("Movie B"), Year: "2021", MediaType: Movie, GUID: "imdb://tt2222222"},
-				"300": {Title: runesafe.NewUntrusted("Movie C"), Year: "2022", MediaType: Movie, GUID: "imdb://tt3333333"},
+				"100": {Title: textsafe.NewUntrusted("Movie A"), Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"},
+				"200": {Title: textsafe.NewUntrusted("Movie B"), Year: "2021", MediaType: Movie, GUID: "imdb://tt2222222"},
+				"300": {Title: textsafe.NewUntrusted("Movie C"), Year: "2022", MediaType: Movie, GUID: "imdb://tt3333333"},
 			},
 			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "101", Year: "2020", Type: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("movie c", "2022", Movie): {RatingKey: "301", Year: "2022", Type: Movie}},
@@ -572,14 +572,14 @@ func TestMatchStaleItems(t *testing.T) {
 		},
 		{
 			name:        "title with leading trailing whitespace",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("  The Matrix  "), Year: "1999", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("  The Matrix  "), Year: "1999", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("the matrix", "1999", Movie): {RatingKey: "200", Year: "1999", Type: Movie}},
 			enableTY:    true, enableTO: true,
 			checks: []check{matchCount(1, 0), matchKey(0, "200")},
 		},
 		{
 			name:        "guid match same key falls through to title",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Movie"), Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Movie"), Year: "2020", MediaType: Movie, GUID: "imdb://tt1111111"}},
 			byGUID:      map[string]PlexEntry{"imdb://tt1111111": {RatingKey: "100", Year: "2020", Type: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("movie", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}},
 			enableTY:    true, enableTO: true,
@@ -587,14 +587,14 @@ func TestMatchStaleItems(t *testing.T) {
 		},
 		{
 			name:     "title only same key falls through to unmatched",
-			stale:    map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Unique Movie"), Year: "2020", MediaType: Movie}},
+			stale:    map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Unique Movie"), Year: "2020", MediaType: Movie}},
 			byTitle:  map[string]PlexEntry{titleKey("unique movie", Movie): {RatingKey: "100", Year: "2020", Type: Movie}},
 			enableTY: true, enableTO: true,
 			checks: []check{matchCount(0, 1)},
 		},
 		{
 			name:        "title year same key falls through to title only",
-			stale:       map[string]TautulliEntry{"100": {Title: runesafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
+			stale:       map[string]TautulliEntry{"100": {Title: textsafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}},
 			byTitleYear: map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "100", Year: "2020", Type: Movie}},
 			byTitle:     map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}},
 			enableTY:    true, enableTO: true,
@@ -639,7 +639,7 @@ func TestNormalizeGUID_emptyID_returnsEmpty(t *testing.T) {
 func TestMatchOne_titleYearTakesPriorityOverTitleOnly(t *testing.T) {
 	// Both indexes hold a valid match; the chain is ordered by increasing
 	// aggressiveness, so title+year must win and title-only must never run.
-	item := &TautulliEntry{Title: runesafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}
+	item := &TautulliEntry{Title: textsafe.NewUntrusted("Dune"), Year: "2020", MediaType: Movie}
 	byTitleYear := map[string]PlexEntry{titleYearKey("dune", "2020", Movie): {RatingKey: "200", Year: "2020", Type: Movie}}
 	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}}
 	key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitleYear: byTitleYear, ByTitle: byTitle}, Fallbacks{TitleYear: true, TitleOnly: true})
@@ -658,7 +658,7 @@ func TestMatchOne_titleOnlyCarriesYearTransition(t *testing.T) {
 	// Title-only is the riskiest strategy and may land on a different year.
 	// Method stays the closed methodTitleOnly value; drift is carried
 	// separately in matchedYear for the operator-facing remap log line.
-	item := &TautulliEntry{Title: runesafe.NewUntrusted("Dune"), Year: "1984", MediaType: Movie}
+	item := &TautulliEntry{Title: textsafe.NewUntrusted("Dune"), Year: "1984", MediaType: Movie}
 	byTitle := map[string]PlexEntry{titleKey("dune", Movie): {RatingKey: "300", Year: "2021", Type: Movie}}
 	key, method, matchedYear := matchOne(item, "100", nil, Index{ByTitle: byTitle}, Fallbacks{TitleYear: true, TitleOnly: true})
 	if key != "300" {
@@ -677,7 +677,7 @@ func TestMatchStaleItems_EpisodeGUIDResolution(t *testing.T) {
 	// ahead of any title/year index entry.
 	stale := map[string]TautulliEntry{
 		"100": {
-			Title: runesafe.NewUntrusted("Show"), Year: "2021", MediaType: Show,
+			Title: textsafe.NewUntrusted("Show"), Year: "2021", MediaType: Show,
 			EpisodeGUIDs: []string{"plex://episode/aaa"},
 		},
 	}
@@ -699,9 +699,9 @@ func TestMatchStaleItems_EpisodeGUIDResolution(t *testing.T) {
 func TestProcessHistoryRow_UnknownMediaTypeSkipped(t *testing.T) {
 	items := map[string]TautulliEntry{}
 	rows := []*HistoryItem{
-		{RatingKey: 42, Title: runesafe.NewUntrusted("Movie"), Year: 2020, MediaType: "movie", GUID: "imdb://tt1234567"},
-		{RatingKey: 99, GrandparentRatingKey: 50, Title: runesafe.NewUntrusted("Ep"), GrandparentTitle: runesafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode", GUID: "tvdb://271557"},
-		{RatingKey: 7, Title: runesafe.NewUntrusted("Song"), Year: 2019, MediaType: "track"},
+		{RatingKey: 42, Title: textsafe.NewUntrusted("Movie"), Year: 2020, MediaType: "movie", GUID: "imdb://tt1234567"},
+		{RatingKey: 99, GrandparentRatingKey: 50, Title: textsafe.NewUntrusted("Ep"), GrandparentTitle: textsafe.NewUntrusted("Show"), Year: 2021, MediaType: "episode", GUID: "tvdb://271557"},
+		{RatingKey: 7, Title: textsafe.NewUntrusted("Song"), Year: 2019, MediaType: "track"},
 	}
 	for _, row := range rows {
 		ProcessHistoryRow(row, items)
