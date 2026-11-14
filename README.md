@@ -11,16 +11,18 @@ tautulli-remap keeps your Tautulli history attached to your library, in four way
 
 - Finds every history entry that points at a movie or show Plex no longer knows.
 - Matches each one to your library by its TMDB, TVDB, IMDb or Plex metadata ID, then by title and year.
-- Repairs every season and episode of a show once it finds the show.
+- Fixes each matched show's seasons and episodes along with the show.
 - Previews every change by default, and backs up Tautulli before it writes.
 
-It can run once, once a day, or whenever your own scheduler asks.
+It runs a pass on a timer you set, or only when you start one.
 
 ## Who it is for
 
-tautulli-remap is built for people who run Tautulli beside a Plex Media Server and have moved files, re-added content or rebuilt a library. Plex then gives those items new internal IDs, called rating keys, while Tautulli keeps the old ones. It covers movie and TV libraries, not music or photos. Without it, you would open each broken item from Tautulli's history and click Fix Match on its page, one item at a time.
+tautulli-remap is built for people who run Tautulli beside a Plex Media Server and have moved files, re-added content or rebuilt a library. Plex then gives those items new internal IDs, called rating keys, while Tautulli keeps the old ones. It covers movie and TV libraries, not music or photos. Without it, you would click Fix Match on each broken item in Tautulli, one at a time.
 
 You need a Tautulli instance and its API key, and a Plex Media Server and a Plex token for it.
+
+Consider [SwiftPanda16's metadata update script](https://gist.github.com/JonnyWong16/f554f407832076919dc6864a78432db2) if you also need to fix a music library's history. It is one Python file you run by hand.
 
 tautulli-remap is free software under the GPL-3.0-or-later license.
 <!-- hub-overview END -->
@@ -38,11 +40,11 @@ services:
 
     # Put these four values in a .env file beside this file before the first start.
     environment:
-      - TAUTULLI_URL  # from .env, the address you open Tautulli at, such as http://192.0.2.10:8181
-      - TAUTULLI_API_KEY  # from .env, the API key on Tautulli's Settings, Web Interface page
-      - PLEX_URL  # from .env, the address you open Plex at, such as http://192.0.2.10:32400
-      - PLEX_TOKEN  # from .env, find it with https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
-      - "REMAP_INTERVAL=24h"  # a pass at start, then once a day. "off" runs a pass only when you trigger one
+      - TAUTULLI_URL  # the address you open Tautulli at, such as http://192.0.2.10:8181, read from .env
+      - TAUTULLI_API_KEY  # the API key on Tautulli's Settings, Web Interface page, read from .env
+      - PLEX_URL  # the address you open Plex at, such as http://192.0.2.10:32400, read from .env
+      - PLEX_TOKEN  # your Plex token, read from .env. Find it with https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+      - "REMAP_INTERVAL=24h"  # a pass at start, then once a day. "off" waits for you to start each pass, see docs/configuration.md
       - "DRY_RUN=true"  # preview only. Set it to false to apply the changes
 ```
 
@@ -67,7 +69,9 @@ The first pass starts right away and only previews. Run `docker logs tautulli-re
 
 When the `remap` lines look right, set `DRY_RUN=false` in `compose.yaml` and run `docker compose up -d` again. Before its first change, each pass asks Tautulli to back up its database. If that backup fails, the pass stops without changing anything.
 
-When two Plex items share a title and year, it leaves that entry alone rather than guess. After it updates history, it clears Tautulli's recently added list, so that list shows no entries that point at old items. Tautulli fills it again from Plex. A later pass finds nothing left to fix and changes nothing. [How tautulli-remap works](docs/how-it-works.md) explains each match method.
+When two Plex items share a title and year, tautulli-remap does not guess between them. Unless a metadata ID matches, that entry stays as it is and gets a `no match` line in the log. [How tautulli-remap works](docs/how-it-works.md) explains each match method.
+
+After it updates history, it empties Tautulli's whole recently added list, because entries there can still point at old items. Tautulli's API cannot remove single entries. Tautulli fills the list again from Plex. A later pass finds nothing left to fix and changes nothing.
 
 ## Configuration reference
 
@@ -79,7 +83,7 @@ Settings are environment variables. The container reads them when it starts, so 
 | `TAUTULLI_API_KEY` | Tautulli API key, from Settings, Web Interface. `TAUTULLI_API_KEY_FILE` reads it from a file instead | required |
 | `PLEX_URL` | Address of your Plex Media Server, with `http://` and the port | `http://plex:32400` |
 | `PLEX_TOKEN` | Plex token for that server. `PLEX_TOKEN_FILE` reads it from a file instead | required |
-| `REMAP_INTERVAL` | Time between passes, such as `24h` or `6h30m`. `off` runs a pass only when you run `tautulli-remap trigger` | `off` |
+| `REMAP_INTERVAL` | Time between passes, such as `24h` or `6h30m`. `off` turns the timer off, so passes run only when you or a scheduler start one | `off` |
 | `DRY_RUN` | `true` only logs what would change. `false` applies it | `true` |
 | `FALLBACK_TITLE_YEAR` | Match by title and year when no metadata ID matches | `true` |
 | `FALLBACK_TITLE_ONLY` | Match by title alone as a last resort, which can pick the wrong item | `false` |
@@ -91,11 +95,11 @@ tautulli-remap needs no volume and opens no port. [Configuration](docs/configura
 
 ## Security
 
-tautulli-remap opens no port, and connects out only to the Tautulli and Plex addresses you set. It never logs your API key or Plex token. It sends the token in a request header, and removes the key from every error it logs. Over a plain `http://` address, both cross your network unencrypted. Set `TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` to keep them out of `docker inspect`. The image runs as a non-root user on a distroless base, which has no shell. [Security](docs/hardening.md) has a hardened compose setup and lists what the image contains.
+tautulli-remap opens no port, and connects out only to the Tautulli and Plex addresses you set. It never logs your API key or Plex token. It sends the token in a request header, and removes the key from every error it logs. Over a plain `http://` address, both cross your network unencrypted. Set `TAUTULLI_API_KEY_FILE` and `PLEX_TOKEN_FILE` to keep them out of `docker inspect`. The image runs as a non-root user and has no shell or package manager. [Security](docs/hardening.md) has a hardened compose setup and lists what the image contains.
 
 ## Troubleshooting
 
-With `REMAP_INTERVAL` set to a duration, an unhealthy container means passes keep failing or have stopped. The lines below name the usual causes, and the next good pass makes it healthy again. With `REMAP_INTERVAL=off`, read the exit code of `tautulli-remap trigger` instead.
+With `REMAP_INTERVAL` set to a duration, the container turns unhealthy when passes keep failing or have stopped. The lines below name the usual causes, and the next good pass makes it healthy again. With `REMAP_INTERVAL=off`, the container stays healthy even when a pass fails. Start the pass with `docker exec tautulli-remap /tautulli-remap trigger` instead, and read its exit code, 0 when the pass succeeded and 1 when it failed.
 
 - The container restarts in a loop with `failed to load configuration`. `TAUTULLI_API_KEY` or `PLEX_TOKEN` did not reach it. Check `.env`, then run `docker compose up -d`.
 - The log says `failed to get history`. The Tautulli address or API key is wrong, or Tautulli is down.
@@ -104,7 +108,7 @@ With `REMAP_INTERVAL` set to a duration, an unhealthy container means passes kee
 
 ## Monitoring
 
-tautulli-remap serves no metrics and ships no alert rules. With your own scheduler, read the exit code of `tautulli-remap trigger`. The image has a Docker healthcheck. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
+tautulli-remap serves no metrics and ships no alert rules. With your own scheduler, read the exit code of `tautulli-remap trigger`. The image has a Docker healthcheck. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) explains what the healthcheck checks and who hears about a failed pass.
 
 ## Documentation
 
@@ -129,5 +133,4 @@ This project was built with AI assistance. The human maintainer defines architec
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE). The image carries the license text of
-every bundled component under `/usr/share/licenses/`.
+GPL-3.0-or-later. See [LICENSE](LICENSE). The image carries the license text of every bundled component under `/usr/share/licenses/`.

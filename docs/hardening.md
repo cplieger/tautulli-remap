@@ -12,7 +12,7 @@ This page covers how tautulli-remap handles your Tautulli API key and Plex token
 - Every request has a time limit and every answer a size limit. A Tautulli request stops after 2 minutes at most, and a Tautulli answer is read up to 30 MB.
 - Reads from Tautulli and Plex are retried with growing delays, and a server's `Retry-After` is honored. Changes to Tautulli are never retried.
 - Titles from Plex are treated as untrusted text before they reach the logs.
-- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it writes only two files: its health file, `/dev/shm/tautulli-remap.healthy`, and its run lock, `/tmp/.remap.lock`.
+- The code uses no `unsafe`, `reflect` or `os/exec`. Besides the key and token files you name, it writes only its health file, `/dev/shm/tautulli-remap.healthy`, and its run lock, `/tmp/.remap.lock`.
 
 ## Hardened compose setup
 

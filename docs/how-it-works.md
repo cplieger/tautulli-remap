@@ -15,7 +15,7 @@ Plex gives every movie, show, season and episode an internal ID, its rating key.
 5. With `DRY_RUN=false`, it backs up Tautulli's database and updates each match. With `DRY_RUN=true`, it only logs each match.
 6. If it updated anything, it clears Tautulli's recently added list.
 
-Each pass that gets past its checks ends with a `scan complete` line. A pass that stops early logs its reason instead. The `scan complete` line counts the entries read, the stale, matched and unmatched ones, and the updates made and failed. Every stale item no method could match gets its own `no match` line with its title, year and old key.
+Each pass that gets past its checks ends with a `scan complete` line. A pass that stops early logs its reason instead. The `scan complete` line counts the entries read, the stale, matched and unmatched ones, and the updates made and failed. Every stale item no method could match gets its own `no match` line with its title, year and old key. An entry for an item you deleted from Plex stays stale, so it gets that line on every pass.
 
 ## Match methods, most precise first
 
@@ -26,7 +26,7 @@ The first method that finds a match wins.
 3. Title and year, when `FALLBACK_TITLE_YEAR` is `true`, the default. Titles are compared without case or surrounding spaces, within the same type.
 4. Title only, when `FALLBACK_TITLE_ONLY` is `true`. It is off by default, because a remake or a reboot with the same title can match the wrong item. It stays within the same type.
 
-No method ever returns the item's old key. Two Plex items can share one lookup value, such as the same title and year. That value is then dropped, and the entry stays unmatched rather than guessed. A shared title and year logs `title+year index shadow; refusing to match this ambiguous slot`.
+No method ever returns the item's old key. Two Plex items can share one lookup value, such as the same title and year. tautulli-remap then drops that value rather than guess between the items, and the other methods still apply. A metadata ID can still match one of them. A shared title and year logs `title+year index shadow; refusing to match this ambiguous slot`.
 
 ## What changes in Tautulli
 
@@ -35,6 +35,7 @@ tautulli-remap works through Tautulli's standard API, so Tautulli's raw SQL acce
 - Before the first update, it calls Tautulli's `backup_db` command, which saves a copy of Tautulli's database. If the backup fails, the pass stops without changing anything. A dry run or a pass with nothing to fix takes no backup.
 - For each match, it calls `update_metadata_details` with the old and the new rating key. For a show, Tautulli also updates the show's seasons and episodes, so one match brings back the whole show.
 - After 10 failed updates in a row, it stops the pass.
+- Updates already made stay in place when a later one fails. The backup is how you return to the state before the pass.
 - After at least one update, it calls `delete_recently_added`, which empties Tautulli's whole recently added list. The API has no way to remove single entries. Tautulli fills the list again from Plex. A dry run logs `(dry run) would clear recently added items` instead.
 
 A fixed item is no longer stale, so running a pass again is safe and changes nothing that is already right.
@@ -50,7 +51,7 @@ A pass fails in these cases:
 - clearing the recently added list fails
 - updates failed and none succeeded
 
-A pass where some updates succeed and some fail counts as a success, and the next pass retries what is left.
+A pass where some updates succeed and some fail counts as a success, and the next pass retries what is left. A pass that leaves items unmatched and updates nothing also counts as a success.
 
 ## One pass at a time
 
