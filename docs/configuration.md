@@ -10,13 +10,21 @@ This page covers the run modes, starting passes from your own scheduler, and rea
 - `off`, `disabled`, `0` or `0s`, or no value at all, turns the timer off. The container stays running and healthy, and a pass runs only when something triggers it.
 - A value that is not a valid duration, or a negative one, logs a warning and works like `off`.
 
-In either mode you can start a pass by hand:
+In either mode you can start a pass by hand in the running container:
 
 ```sh
 docker exec tautulli-remap /tautulli-remap trigger
 ```
 
 The command waits for the pass and exits with its result, as listed in [Health and exit codes](how-it-works.md#health-and-exit-codes).
+
+To run one pass and leave no container running, start a one-off container from the folder that holds `.env`:
+
+```sh
+docker run --rm --env-file .env ghcr.io/cplieger/tautulli-remap:latest trigger
+```
+
+It previews only, because `DRY_RUN` defaults to `true`. Add `-e DRY_RUN=false` before the image name to apply the changes.
 
 ## Start passes from your own scheduler
 
@@ -53,5 +61,6 @@ A plain `TAUTULLI_API_KEY` or `PLEX_TOKEN` that holds only spaces is accepted. T
 
 ## Other settings
 
+- `TAUTULLI_URL` can include Tautulli's URL base, such as `http://192.0.2.10:8181/tautulli`, with no trailing `/`.
 - `MAX_HISTORY_RECORDS` set to 0 or a negative number logs a warning and uses the default, 500,000.
 - Logs are text at the info level, with times in UTC. `TZ` has no effect.
