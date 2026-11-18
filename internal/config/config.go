@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/envx/v2"
 )
 
 // DefaultMaxHistoryRecords caps Tautulli history size a run will process;
