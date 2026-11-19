@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/envx/v2"
+	"github.com/cplieger/go/masked"
 )
 
 // DefaultMaxHistoryRecords caps Tautulli history size a run will process;
@@ -18,10 +19,10 @@ const DefaultMaxHistoryRecords = 500_000
 
 // Config holds the application configuration.
 type Config struct {
+	TautulliAPIKey    masked.Secret
+	PlexToken         masked.Secret
 	TautulliURL       string
-	TautulliAPIKey    string
 	PlexURL           string
-	PlexToken         string
 	RemapInterval     time.Duration // 0 = resident-idle (external trigger)
 	MaxHistoryRecords int
 	DryRun            bool
@@ -118,12 +119,12 @@ func (cfg *Config) Log() {
 // companion wins when set) and returns *envx.MissingError if absent. A
 // whitespace-only value is returned unchanged but warns, since it will fail
 // upstream authentication.
-func requireSecret(key envx.Key) (string, error) {
+func requireSecret(key envx.Key) (masked.Secret, error) {
 	v, err := envx.Secret(key)
 	if err != nil {
-		return "", err
+		return masked.Secret{}, err
 	}
-	if strings.TrimSpace(v) == "" {
+	if strings.TrimSpace(v.Reveal()) == "" {
 		slog.Warn("required secret is set but contains only whitespace; requests will fail authentication",
 			"key", key)
 	}

@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/envx/v2"
+	"github.com/cplieger/go/masked"
 	"github.com/cplieger/go/slogx/capture"
 )
 
@@ -41,14 +42,14 @@ func TestLoad(t *testing.T) {
 	if cfg.RemapInterval != 12*time.Hour {
 		t.Errorf("RemapInterval = %v, want 12h", cfg.RemapInterval)
 	}
-	if cfg.TautulliAPIKey != "test-key" {
-		t.Errorf("TautulliAPIKey = %q, want %q", cfg.TautulliAPIKey, "test-key")
+	if cfg.TautulliAPIKey.Reveal() != "test-key" {
+		t.Errorf("TautulliAPIKey = %q, want %q", cfg.TautulliAPIKey.Reveal(), "test-key")
 	}
 	if cfg.PlexURL != "http://localhost:32400" {
 		t.Errorf("PlexURL = %q, want %q", cfg.PlexURL, "http://localhost:32400")
 	}
-	if cfg.PlexToken != "test-token" {
-		t.Errorf("PlexToken = %q, want %q", cfg.PlexToken, "test-token")
+	if cfg.PlexToken.Reveal() != "test-token" {
+		t.Errorf("PlexToken = %q, want %q", cfg.PlexToken.Reveal(), "test-token")
 	}
 }
 
@@ -249,9 +250,9 @@ func TestLog_neverLogsSecrets(t *testing.T) {
 	getLogs := captureLogs(t)
 	(&Config{
 		TautulliURL:    "http://tautulli:8181",
-		TautulliAPIKey: apiKey,
+		TautulliAPIKey: masked.NewSecret(apiKey),
 		PlexURL:        "http://plex:32400",
-		PlexToken:      token,
+		PlexToken:      masked.NewSecret(token),
 		RemapInterval:  24 * time.Hour,
 	}).Log()
 	logs := getLogs()
@@ -357,11 +358,11 @@ func TestLoad_whitespaceOnlySecretWarnsButProceeds(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load() error = %v, want nil (a whitespace-only secret must not fail Load)", err)
 			}
-			if cfg.TautulliAPIKey != tt.apiKey {
-				t.Errorf("TautulliAPIKey = %q, want %q loaded verbatim", cfg.TautulliAPIKey, tt.apiKey)
+			if cfg.TautulliAPIKey.Reveal() != tt.apiKey {
+				t.Errorf("TautulliAPIKey = %q, want %q loaded verbatim", cfg.TautulliAPIKey.Reveal(), tt.apiKey)
 			}
-			if cfg.PlexToken != tt.token {
-				t.Errorf("PlexToken = %q, want %q loaded verbatim", cfg.PlexToken, tt.token)
+			if cfg.PlexToken.Reveal() != tt.token {
+				t.Errorf("PlexToken = %q, want %q loaded verbatim", cfg.PlexToken.Reveal(), tt.token)
 			}
 			logs := getLogs()
 			gotAPIWarn := strings.Contains(logs, "only whitespace") && strings.Contains(logs, "key=TAUTULLI_API_KEY")
