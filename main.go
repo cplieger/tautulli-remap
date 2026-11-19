@@ -148,7 +148,7 @@ func finishTrigger(ctx context.Context, ok bool) int {
 // Tautulli keeps the app-built one (2-minute budget, refuse-all redirects so
 // the API key never rides a hostile 3xx).
 func buildOrchestrator(cfg *appconfig.Config) (*orchestrator.Orchestrator, error) {
-	plexClient, err := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken))
+	plexClient, err := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken.Reveal()))
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +156,6 @@ func buildOrchestrator(cfg *appconfig.Config) (*orchestrator.Orchestrator, error
 		Timeout:       tautulli.ClientTimeout,
 		CheckRedirect: httpclient.RefuseAllRedirects,
 	}
-	tautulliClient := tautulli.New(cfg.TautulliURL, cfg.TautulliAPIKey, httpClient)
+	tautulliClient := tautulli.New(cfg.TautulliURL, cfg.TautulliAPIKey.Reveal(), httpClient)
 	return orchestrator.New(plexClient, tautulliClient, cfg), nil
 }

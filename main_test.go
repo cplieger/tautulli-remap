@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/health/v2"
+	"github.com/cplieger/go/masked"
 	appconfig "github.com/cplieger/tautulli-remap/internal/config"
 )
 
@@ -164,7 +165,7 @@ func TestRunResident_keeps_the_health_file_while_it_runs_and_removes_it_at_shutd
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			url := fakeServers(t)
-			cfg := &appconfig.Config{TautulliURL: url, TautulliAPIKey: "test-key", PlexURL: url, PlexToken: "test-token", DryRun: true, RemapInterval: tt.interval}
+			cfg := &appconfig.Config{TautulliURL: url, TautulliAPIKey: masked.NewSecret("test-key"), PlexURL: url, PlexToken: masked.NewSecret("test-token"), DryRun: true, RemapInterval: tt.interval}
 			orch, err := buildOrchestrator(cfg)
 			if err != nil {
 				t.Fatalf("Setup: %v", err)

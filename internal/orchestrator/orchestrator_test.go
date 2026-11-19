@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/masked"
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/tautulli-remap/internal/config"
@@ -80,20 +81,20 @@ func testServer(t *testing.T, handler http.HandlerFunc) *config.Config {
 	t.Cleanup(srv.Close)
 	return &config.Config{
 		TautulliURL:    srv.URL,
-		TautulliAPIKey: "test-key",
+		TautulliAPIKey: masked.NewSecret("test-key"),
 		PlexURL:        srv.URL,
-		PlexToken:      "test-token",
+		PlexToken:      masked.NewSecret("test-token"),
 		DryRun:         true,
 	}
 }
 
 func newOrch(t *testing.T, cfg *config.Config) *Orchestrator {
 	t.Helper()
-	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken))
+	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken.Reveal()))
 	if perr != nil {
 		t.Fatalf("plex.New: %v", perr)
 	}
-	tc := tautulli.New(cfg.TautulliURL, cfg.TautulliAPIKey, &http.Client{})
+	tc := tautulli.New(cfg.TautulliURL, cfg.TautulliAPIKey.Reveal(), &http.Client{})
 	tc.RetryDelayUnit = time.Millisecond
 	o := New(pc, tc, cfg)
 	o.PaginationDelay = time.Millisecond
@@ -417,7 +418,7 @@ func TestBuildPlexIndex_AllThreeIndexes(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
-	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken))
+	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken.Reveal()))
 	if perr != nil {
 		t.Fatalf("plex.New: %v", perr)
 	}
@@ -473,7 +474,7 @@ func TestBuildPlexIndex_SkipsNonMovieShowSections(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
-	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken))
+	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken.Reveal()))
 	if perr != nil {
 		t.Fatalf("plex.New: %v", perr)
 	}
@@ -502,7 +503,7 @@ func TestBuildPlexIndex_CancelBetweenSections(t *testing.T) {
 			w.Write([]byte(`{"MediaContainer":{"Metadata":[]}}`))
 		}
 	})
-	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken))
+	pc, perr := plex.New(cfg.PlexURL, plex.Token(cfg.PlexToken.Reveal()))
 	if perr != nil {
 		t.Fatalf("plex.New: %v", perr)
 	}
